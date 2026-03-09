@@ -3,56 +3,93 @@
 {{template "nav" .}}
 {{$job := .JobDetails.Job}}
 {{$ws := .JobDetails.Workspace}}
-<main class="mx-auto max-w-7xl px-6 py-8" data-job-detail="{{$job.ID}}" data-last-sequence="{{.LastLogSequence}}">
-  <div class="mb-8 flex flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-slate-950/30 lg:flex-row lg:items-start lg:justify-between">
+<main class="mx-auto max-w-7xl px-4 py-6 space-y-4" data-job-detail="{{$job.ID}}" data-last-sequence="{{.LastLogSequence}}" data-log-detailed="true" data-log-time="false" data-log-wrap="true">
+  <section class="panel panel-hero flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
     <div>
-      <div class="flex flex-wrap items-center gap-3">
-        <h1 class="text-3xl font-semibold tracking-tight text-white">{{$job.JobType}}</h1>
-        <span id="job-status" class="inline-flex rounded-full px-3 py-1 text-xs font-medium {{statusClass $job.Status}}">{{$job.Status}}</span>
+      <div class="flex flex-wrap items-center gap-2">
+        <h1 class="text-2xl font-semibold tracking-tight text-body">{{$job.JobType}}</h1>
+        <span id="job-status" class="status-pill {{statusClass $job.Status}}">{{$job.Status}}</span>
       </div>
-      <p class="mt-3 text-sm text-slate-300">Workspace <a href="/workspaces/{{$ws.ID}}" class="font-medium text-sky-300 hover:text-sky-200">{{$ws.Name}}</a></p>
-      {{if $job.LastError}}<p class="mt-3 text-sm text-rose-300">{{$job.LastError}}</p>{{end}}
+      <p class="mt-2 text-sm text-muted">Workspace <a href="/workspaces/{{$ws.ID}}" class="font-medium text-sky-600 hover:text-sky-500">{{$ws.Name}}</a></p>
+      {{if $job.LastError}}<p class="mt-2 text-sm text-rose-500">{{$job.LastError}}</p>{{end}}
     </div>
-    <div class="flex flex-wrap gap-3">
-      <form method="post" action="/jobs/{{$job.ID}}/cancel"><button type="submit" class="inline-flex items-center rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">Stop</button></form>
-      <form method="post" action="/jobs/{{$job.ID}}/resume"><button type="submit" class="inline-flex items-center rounded-2xl bg-sky-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-300">Resume</button></form>
-      <form method="post" action="/jobs/{{$job.ID}}/delete"><button type="submit" class="inline-flex items-center rounded-2xl bg-rose-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-400">Delete record</button></form>
+    <div class="flex flex-wrap gap-2">
+      <form method="post" action="/jobs/{{$job.ID}}/cancel" data-job-action="stop" {{if or (eq $job.Status "failed") (eq $job.Status "done") (eq $job.Status "cancelled")}}class="hidden"{{end}}>
+        <button type="submit" class="btn btn-secondary">Stop</button>
+      </form>
+      <form method="post" action="/jobs/{{$job.ID}}/resume" data-job-action="resume" {{if not (or (eq $job.Status "failed") (eq $job.Status "cancelled"))}}class="hidden"{{end}}>
+        <button type="submit" class="btn btn-primary">Resume</button>
+      </form>
+      <form method="post" action="/jobs/{{$job.ID}}/delete" data-job-action="delete" {{if eq $job.Status "running"}}class="hidden"{{end}}>
+        <button type="submit" class="btn btn-danger">Delete record</button>
+      </form>
     </div>
-  </div>
+  </section>
 
-  <div class="grid gap-6 xl:grid-cols-[1.5fr,1fr]">
-    <section class="rounded-3xl border border-white/10 bg-slate-900/70 p-6 shadow-2xl shadow-slate-950/40">
-      <div class="mb-4 flex items-center justify-between">
-        <h2 class="text-lg font-semibold text-white">Live logs</h2>
-        <p class="text-xs text-slate-400">Auto-refreshing while the job is active</p>
+  <div class="grid gap-4 xl:grid-cols-[1.45fr,0.95fr]">
+    <section class="panel space-y-4">
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 class="text-base font-semibold text-body">Live logs</h2>
+          <p class="mt-1 text-sm text-muted">Detailed stream output with independent toggles for metadata, timestamps, and wrapping.</p>
+        </div>
+        <div class="flex flex-wrap gap-2 text-sm">
+          <label class="toggle-pill">
+            <input type="checkbox" data-log-toggle="detailed" checked>
+            <span>Details</span>
+          </label>
+          <label class="toggle-pill">
+            <input type="checkbox" data-log-toggle="time">
+            <span>Time</span>
+          </label>
+          <label class="toggle-pill">
+            <input type="checkbox" data-log-toggle="wrap" checked>
+            <span>Wrap</span>
+          </label>
+        </div>
       </div>
-      <pre id="job-log-output" class="min-h-[30rem] overflow-auto rounded-2xl bg-slate-950/90 p-4 text-xs leading-6 text-slate-200">{{range .JobDetails.Logs}}[{{.Sequence}}] {{.Message}}
-{{else}}Waiting for logs...
-{{end}}</pre>
+      <div id="job-log-output" class="log-stream">
+        {{range .JobDetails.Logs}}
+        <article class="log-entry" data-sequence="{{.Sequence}}">
+          <div class="log-meta">
+            <span class="log-pill">#{{.Sequence}}</span>
+            <span class="log-pill">{{.Stream}}</span>
+            <span class="log-pill log-timestamp">{{formatTime .CreatedAt}}</span>
+          </div>
+          <pre class="log-message">{{.Message}}</pre>
+        </article>
+        {{else}}
+        <div class="empty-log-state" data-empty-log-state>Waiting for logs...</div>
+        {{end}}
+      </div>
     </section>
 
-    <aside class="space-y-6">
-      <article class="rounded-3xl border border-white/10 bg-slate-900/70 p-6 shadow-2xl shadow-slate-950/40">
-        <h2 class="text-lg font-semibold text-white">Metadata</h2>
-        <dl class="mt-4 space-y-4 text-sm">
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-xs uppercase tracking-[0.25em] text-slate-500">Workspace ID</dt><dd class="mt-2 break-all text-slate-200">{{$ws.ID}}</dd></div>
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-xs uppercase tracking-[0.25em] text-slate-500">Attempt</dt><dd class="mt-2 text-slate-200">{{$job.Attempt}}</dd></div>
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-xs uppercase tracking-[0.25em] text-slate-500">Created</dt><dd class="mt-2 text-slate-200">{{formatTime $job.CreatedAt}}</dd></div>
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-xs uppercase tracking-[0.25em] text-slate-500">Started</dt><dd class="mt-2 text-slate-200">{{formatOptTime $job.StartedAt}}</dd></div>
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><dt class="text-xs uppercase tracking-[0.25em] text-slate-500">Finished</dt><dd class="mt-2 text-slate-200">{{formatOptTime $job.FinishedAt}}</dd></div>
+    <aside class="space-y-4">
+      <article class="panel space-y-4">
+        <h2 class="text-base font-semibold text-body">Metadata</h2>
+        <dl class="grid gap-3 text-sm">
+          <div class="surface-card"><dt class="meta-label">Workspace ID</dt><dd class="mt-2 break-all text-soft">{{$ws.ID}}</dd></div>
+          <div class="surface-card"><dt class="meta-label">Attempt</dt><dd class="mt-2 text-soft">{{$job.Attempt}}</dd></div>
+          <div class="surface-card"><dt class="meta-label">Created</dt><dd class="mt-2 text-soft">{{formatTime $job.CreatedAt}}</dd></div>
+          <div class="surface-card"><dt class="meta-label">Started</dt><dd class="mt-2 text-soft">{{formatOptTime $job.StartedAt}}</dd></div>
+          <div class="surface-card"><dt class="meta-label">Finished</dt><dd class="mt-2 text-soft">{{formatOptTime $job.FinishedAt}}</dd></div>
         </dl>
       </article>
 
-      <article class="rounded-3xl border border-white/10 bg-slate-900/70 p-6 shadow-2xl shadow-slate-950/40">
-        <h2 class="text-lg font-semibold text-white">Workspace snapshot</h2>
-        <div class="mt-4 space-y-4 text-sm text-slate-300">
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-500">State</p>
-            <p class="mt-2">{{ $ws.State }}</p>
+      <article class="panel space-y-4">
+        <h2 class="text-base font-semibold text-body">Workspace snapshot</h2>
+        <div class="space-y-3 text-sm text-soft">
+          <div class="surface-card">
+            <p class="meta-label">State</p>
+            <p class="mt-2">{{$ws.State}}</p>
           </div>
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-500">Access</p>
+          <div class="surface-card">
+            <p class="meta-label">Access</p>
             <p class="mt-2">{{if gt $ws.SSHPort 0}}ssh -p {{$ws.SSHPort}} codespace@{{$ws.SSHHost}}{{else}}Pending{{end}}</p>
+          </div>
+          <div class="surface-card">
+            <p class="meta-label">Image</p>
+            <p class="mt-2 break-all">{{if $ws.ResolvedImageRef}}{{$ws.ResolvedImageRef}}{{else}}Pending build resolution{{end}}</p>
           </div>
         </div>
       </article>
@@ -63,4 +100,3 @@
 </body>
 </html>
 {{end}}
-

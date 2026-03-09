@@ -1,45 +1,45 @@
 {{define "jobs"}}
 {{template "head" .}}
 {{template "nav" .}}
-<main class="mx-auto max-w-7xl px-6 py-8">
-  <section class="mb-8 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-slate-950/30">
-    <p class="text-sm uppercase tracking-[0.3em] text-sky-300">Execution center</p>
-    <h1 class="mt-2 text-3xl font-semibold tracking-tight text-white">Jobs</h1>
-    <p class="mt-2 max-w-3xl text-sm text-slate-300">Observe build, provision, and delete jobs. Each job exposes logs plus stop, resume, and cleanup actions.</p>
+<main class="mx-auto max-w-7xl px-4 py-6 space-y-4">
+  <section class="panel panel-hero">
+    <p class="section-eyebrow">Execution center</p>
+    <h1 class="mt-1 text-2xl font-semibold tracking-tight text-body">Jobs</h1>
+    <p class="mt-2 max-w-3xl text-sm text-muted">Observe build, provision, and delete jobs. Logs stream live from the detail page, with stop, resume, and cleanup actions when relevant.</p>
   </section>
 
-  <section class="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70 shadow-2xl shadow-slate-950/40">
+  <section class="panel">
     <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-white/10 text-sm">
-        <thead class="bg-white/5 text-left text-slate-400">
+      <table class="min-w-full text-sm">
+        <thead class="table-head">
           <tr>
-            <th class="px-6 py-4 font-medium">Job</th>
-            <th class="px-6 py-4 font-medium">Workspace</th>
-            <th class="px-6 py-4 font-medium">Status</th>
-            <th class="px-6 py-4 font-medium">Latest log</th>
-            <th class="px-6 py-4 font-medium">Created</th>
-            <th class="px-6 py-4 font-medium"></th>
+            <th class="px-4 py-3 font-medium">Job</th>
+            <th class="px-4 py-3 font-medium">Workspace</th>
+            <th class="px-4 py-3 font-medium">Status</th>
+            <th class="px-4 py-3 font-medium">Latest log</th>
+            <th class="px-4 py-3 font-medium">Created</th>
+            <th class="px-4 py-3 font-medium"></th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-white/5">
+        <tbody>
           {{range .Jobs}}
-          <tr class="hover:bg-white/5">
-            <td class="px-6 py-4 align-top">
-              <p class="font-medium text-white">{{.JobType}}</p>
-              <p class="mt-1 text-xs text-slate-400">Attempt {{.Attempt}}</p>
+          <tr class="table-row">
+            <td class="px-4 py-3 align-top">
+              <p class="font-medium text-body">{{.JobType}}</p>
+              <p class="mt-1 text-xs text-muted">Attempt {{.Attempt}}</p>
             </td>
-            <td class="px-6 py-4 align-top text-slate-300">{{.WorkspaceID}}</td>
-            <td class="px-6 py-4 align-top">
-              <span class="inline-flex rounded-full px-3 py-1 text-xs font-medium {{statusClass .Status}}">{{.Status}}</span>
-              {{if .LastError}}<div class="mt-2 max-w-xs text-xs text-rose-300">{{truncate .LastError 80}}</div>{{end}}
+            <td class="px-4 py-3 align-top text-soft">{{.WorkspaceID}}</td>
+            <td class="px-4 py-3 align-top">
+              <span class="status-pill {{statusClass .Status}}">{{.Status}}</span>
+              {{if .LastError}}<div class="mt-2 max-w-xs text-xs text-rose-500">{{truncate .LastError 96}}</div>{{end}}
             </td>
-            <td class="px-6 py-4 align-top text-slate-300">{{if .LatestLog}}{{truncate .LatestLog 80}}{{else}}-{{end}}</td>
-            <td class="px-6 py-4 align-top text-slate-300">{{formatTime .CreatedAt}}</td>
-            <td class="px-6 py-4 align-top text-right"><a href="/jobs/{{.ID}}" class="rounded-xl border border-white/10 px-3 py-2 font-medium text-white hover:bg-white/10">Details</a></td>
+            <td class="px-4 py-3 align-top text-soft">{{if .LatestLog}}{{truncate .LatestLog 120}}{{else}}-{{end}}</td>
+            <td class="px-4 py-3 align-top text-soft">{{formatTime .CreatedAt}}</td>
+            <td class="px-4 py-3 align-top text-right"><a href="/jobs/{{.ID}}" class="btn btn-secondary btn-sm">Details</a></td>
           </tr>
           {{else}}
           <tr>
-            <td colspan="6" class="px-6 py-16 text-center text-slate-400">No jobs recorded yet.</td>
+            <td colspan="6" class="px-4 py-14 text-center text-sm text-muted">No jobs recorded yet.</td>
           </tr>
           {{end}}
         </tbody>
@@ -51,4 +51,3 @@
 </body>
 </html>
 {{end}}
-

@@ -2,132 +2,142 @@
 {{template "head" .}}
 {{template "nav" .}}
 {{$ws := .WorkspaceDetails.Workspace}}
-<main class="mx-auto max-w-7xl px-6 py-8" data-workspace-detail="{{$ws.ID}}">
-  <div class="mb-8 flex flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-sky-950/20 lg:flex-row lg:items-start lg:justify-between">
+<main class="mx-auto max-w-7xl px-4 py-6 space-y-4" data-workspace-detail="{{$ws.ID}}">
+  <section class="panel panel-hero flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
     <div>
-      <div class="flex flex-wrap items-center gap-3">
-        <h1 class="text-3xl font-semibold tracking-tight text-white">{{$ws.Name}}</h1>
-        <span id="workspace-state" class="inline-flex rounded-full px-3 py-1 text-xs font-medium {{statusClass $ws.State}}">{{$ws.State}}</span>
+      <div class="flex flex-wrap items-center gap-2">
+        <h1 class="text-2xl font-semibold tracking-tight text-body">{{$ws.Name}}</h1>
+        <span id="workspace-state" class="status-pill {{statusClass $ws.State}}">{{$ws.State}}</span>
       </div>
-      <p class="mt-3 max-w-3xl text-sm text-slate-300">{{if $ws.RepoURL}}{{$ws.RepoURL}}{{else}}No repository configured.{{end}}</p>
-      {{if $ws.LastError}}<p class="mt-3 text-sm text-rose-300" id="workspace-last-error">{{$ws.LastError}}</p>{{else}}<p class="mt-3 text-sm text-slate-500" id="workspace-last-error"></p>{{end}}
+      <p class="mt-2 max-w-4xl text-sm text-muted">{{if $ws.RepoURL}}{{$ws.RepoURL}}{{else}}No repository configured.{{end}}</p>
+      {{if $ws.LastError}}<p class="mt-2 text-sm text-rose-500" id="workspace-last-error">{{$ws.LastError}}</p>{{else}}<p class="mt-2 text-sm text-muted" id="workspace-last-error"></p>{{end}}
     </div>
-    <div class="flex gap-3">
-      <a href="/jobs" class="inline-flex items-center rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">View jobs</a>
+    <div class="flex flex-wrap gap-2">
+      <a href="/jobs" class="btn btn-secondary">View jobs</a>
       {{if ne $ws.State "deleted"}}
       <form method="post" action="/workspaces/{{$ws.ID}}/delete">
-        <button type="submit" class="inline-flex items-center rounded-2xl bg-rose-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-400">Delete workspace</button>
+        <button type="submit" class="btn btn-danger">Delete workspace</button>
       </form>
       {{end}}
     </div>
-  </div>
+  </section>
 
-  <div class="grid gap-6 xl:grid-cols-[1.5fr,1fr]">
-    <section class="space-y-6">
-      <article class="rounded-3xl border border-white/10 bg-slate-900/70 p-6 shadow-2xl shadow-slate-950/40">
-        <h2 class="text-lg font-semibold text-white">Access</h2>
-        <div class="mt-4 space-y-4">
-          <div class="rounded-2xl bg-slate-950/60 p-4">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-500">SSH command</p>
-            <code id="workspace-ssh-command" class="mt-2 block break-all text-sm text-sky-300">{{if gt $ws.SSHPort 0}}ssh -p {{$ws.SSHPort}} codespace@{{$ws.SSHHost}}{{else}}Pending job completion{{end}}</code>
+  <div class="grid gap-4 xl:grid-cols-[1.45fr,0.95fr]">
+    <section class="space-y-4">
+      <article class="panel space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="text-base font-semibold text-body">Access</h2>
+          <span class="text-xs text-muted">Auto-refreshing while the workspace is starting</span>
+        </div>
+        <div class="space-y-3">
+          <div class="surface-card">
+            <p class="meta-label">SSH command</p>
+            <code id="workspace-ssh-command" class="code-block mt-2">{{if gt $ws.SSHPort 0}}ssh -p {{$ws.SSHPort}} codespace@{{$ws.SSHHost}}{{else}}Pending job completion{{end}}</code>
           </div>
-          <div class="grid gap-4 md:grid-cols-2">
-            <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p class="text-xs uppercase tracking-[0.25em] text-slate-500">Public hostname</p>
-              <p id="workspace-public-hostname" class="mt-2 text-sm text-slate-200">{{if $ws.PublicHostname}}{{$ws.PublicHostname}}{{else}}Not configured{{end}}</p>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="surface-card">
+              <p class="meta-label">Public hostname</p>
+              <p id="workspace-public-hostname" class="mt-2 text-sm text-soft">{{if $ws.PublicHostname}}{{$ws.PublicHostname}}{{else}}Not configured{{end}}</p>
             </div>
-            <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p class="text-xs uppercase tracking-[0.25em] text-slate-500">Password login</p>
-              <div class="mt-3 flex flex-col gap-3">
+            <div class="surface-card">
+              <p class="meta-label">Password login</p>
+              <div class="mt-2 space-y-2">
                 {{if .InitialPasswordAvailable}}
-                <button type="button" class="w-fit rounded-xl bg-sky-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-sky-300" data-reveal-password data-url="/workspaces/{{$ws.ID}}/password/reveal">Reveal initial password</button>
+                <p class="text-sm text-muted">Generated automatically because no SSH public keys were supplied.</p>
+                <button type="button" class="btn btn-primary btn-sm" data-reveal-password data-url="/workspaces/{{$ws.ID}}/password/reveal">Reveal initial password</button>
                 {{else}}
-                <p class="text-sm text-slate-400">Password login disabled.</p>
+                <p class="text-sm text-muted">Disabled because SSH public keys were provided.</p>
                 {{end}}
-                <code id="password-output" class="hidden rounded-xl bg-slate-950/60 px-3 py-2 text-sm text-emerald-300"></code>
-                <p id="password-error" class="hidden text-sm text-rose-300"></p>
+                <code id="password-output" class="code-chip hidden"></code>
+                <p id="password-error" class="hidden text-sm text-rose-500"></p>
               </div>
             </div>
           </div>
         </div>
       </article>
 
-      <article class="rounded-3xl border border-white/10 bg-slate-900/70 p-6 shadow-2xl shadow-slate-950/40">
-        <h2 class="text-lg font-semibold text-white">Runtime profile</h2>
-        <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><p class="text-xs uppercase tracking-[0.25em] text-slate-500">Source</p><p class="mt-2 text-sm text-slate-200">{{sourceLabel $ws.SourceType}}</p></div>
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><p class="text-xs uppercase tracking-[0.25em] text-slate-500">CPU</p><p class="mt-2 text-sm text-slate-200">{{$ws.CPUMillis}} millicores</p></div>
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><p class="text-xs uppercase tracking-[0.25em] text-slate-500">Memory</p><p class="mt-2 text-sm text-slate-200">{{$ws.MemoryMB}} MB</p></div>
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4"><p class="text-xs uppercase tracking-[0.25em] text-slate-500">TTL</p><p class="mt-2 text-sm text-slate-200">{{$ws.TTLMinutes}} min</p></div>
+      <article class="panel space-y-4">
+        <h2 class="text-base font-semibold text-body">Runtime profile</h2>
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div class="surface-card"><p class="meta-label">Source</p><p class="mt-2 text-sm text-soft">{{sourceLabel $ws.SourceType}}</p></div>
+          <div class="surface-card"><p class="meta-label">CPU</p><p class="mt-2 text-sm text-soft">{{$ws.CPUMillis}} millicores</p></div>
+          <div class="surface-card"><p class="meta-label">Memory</p><p class="mt-2 text-sm text-soft">{{$ws.MemoryMB}} MB</p></div>
+          <div class="surface-card"><p class="meta-label">Auto shutdown</p><p class="mt-2 text-sm text-soft">{{$ws.TTLMinutes}} minutes</p></div>
+          <div class="surface-card"><p class="meta-label">SSH host port</p><p class="mt-2 text-sm text-soft">{{if gt $ws.SSHPort 0}}{{$ws.SSHPort}}{{else}}Auto-assigned{{end}}</p></div>
+          <div class="surface-card"><p class="meta-label">proxy.pac URL</p><p class="mt-2 break-all text-sm text-soft">{{if $ws.ProxyPACURL}}{{$ws.ProxyPACURL}}{{else}}Not configured{{end}}</p></div>
         </div>
-        <div class="mt-4 grid gap-4 md:grid-cols-2">
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-500">Resolved image</p>
-            <p class="mt-2 break-all text-sm text-slate-200">{{if $ws.ResolvedImageRef}}{{$ws.ResolvedImageRef}}{{else}}Pending build resolution{{end}}</p>
+        <div class="grid gap-3 md:grid-cols-2">
+          <div class="surface-card">
+            <p class="meta-label">Resolved image</p>
+            <p class="mt-2 break-all text-sm text-soft">{{if $ws.ResolvedImageRef}}{{$ws.ResolvedImageRef}}{{else}}Pending build resolution{{end}}</p>
           </div>
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-500">Proxy</p>
-            <p class="mt-2 break-all text-sm text-slate-200">{{if $ws.HTTPProxy}}{{$ws.HTTPProxy}}{{else}}No proxy{{end}}</p>
+          <div class="surface-card">
+            <p class="meta-label">Proxy environment</p>
+            <div class="mt-2 space-y-1 text-sm text-soft">
+              <p>{{if $ws.HTTPProxy}}HTTP_PROXY={{$ws.HTTPProxy}}{{else}}HTTP_PROXY not set{{end}}</p>
+              <p>{{if $ws.HTTPSProxy}}HTTPS_PROXY={{$ws.HTTPSProxy}}{{else}}HTTPS_PROXY not set{{end}}</p>
+              <p>{{if $ws.NoProxy}}NO_PROXY={{$ws.NoProxy}}{{else}}NO_PROXY not set{{end}}</p>
+            </div>
           </div>
         </div>
       </article>
 
-      <article class="rounded-3xl border border-white/10 bg-slate-900/70 p-6 shadow-2xl shadow-slate-950/40">
-        <div class="mb-4 flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-white">Activity</h2>
-          <a href="/jobs" class="text-sm font-medium text-sky-300 hover:text-sky-200">All jobs</a>
+      <article class="panel space-y-4">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-base font-semibold text-body">Activity</h2>
+          <a href="/jobs" class="text-sm font-medium text-sky-600 hover:text-sky-500">All jobs</a>
         </div>
-        <div class="space-y-4">
+        <div class="space-y-3">
           {{range .WorkspaceDetails.Jobs}}
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div class="surface-card">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p class="font-medium text-white">{{.JobType}}</p>
-                <p class="mt-1 text-xs text-slate-400">Created {{formatTime .CreatedAt}}</p>
+                <p class="font-medium text-body">{{.JobType}}</p>
+                <p class="mt-1 text-xs text-muted">Created {{formatTime .CreatedAt}}</p>
               </div>
-              <div class="flex items-center gap-3">
-                <span class="inline-flex rounded-full px-3 py-1 text-xs font-medium {{statusClass .Status}}">{{.Status}}</span>
-                <a href="/jobs/{{.ID}}" class="rounded-xl border border-white/10 px-3 py-2 text-sm font-medium text-white hover:bg-white/10">Details</a>
+              <div class="flex items-center gap-2">
+                <span class="status-pill {{statusClass .Status}}">{{.Status}}</span>
+                <a href="/jobs/{{.ID}}" class="btn btn-secondary btn-sm">Details</a>
               </div>
             </div>
-            {{if .LatestLog}}<p class="mt-3 text-sm text-slate-300">{{.LatestLog}}</p>{{end}}
+            {{if .LatestLog}}<p class="mt-3 text-sm text-soft">{{.LatestLog}}</p>{{end}}
           </div>
           {{else}}
-          <div class="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-slate-400">No jobs recorded yet.</div>
+          <div class="surface-card text-sm text-muted">No jobs recorded yet.</div>
           {{end}}
         </div>
       </article>
     </section>
 
-    <aside class="space-y-6">
-      <article class="rounded-3xl border border-white/10 bg-slate-900/70 p-6 shadow-2xl shadow-slate-950/40">
-        <h2 class="text-lg font-semibold text-white">Authorized keys</h2>
-        <div class="mt-4 space-y-3">
+    <aside class="space-y-4">
+      <article class="panel space-y-4">
+        <h2 class="text-base font-semibold text-body">Authorized keys</h2>
+        <div class="space-y-3">
           {{range .WorkspaceDetails.Keys}}
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p class="text-sm font-medium text-slate-100">{{.KeyType}}</p>
-            <p class="mt-2 break-all font-mono text-xs text-slate-400">{{truncate .PublicKey 96}}</p>
+          <div class="surface-card">
+            <p class="text-sm font-medium text-soft">{{.KeyType}}</p>
+            <p class="mt-2 break-all font-mono text-xs text-muted">{{truncate .PublicKey 128}}</p>
           </div>
           {{else}}
-          <p class="text-sm text-slate-400">No SSH keys stored for this workspace.</p>
+          <p class="text-sm text-muted">No SSH keys stored for this workspace.</p>
           {{end}}
         </div>
       </article>
 
-      <article class="rounded-3xl border border-white/10 bg-slate-900/70 p-6 shadow-2xl shadow-slate-950/40">
-        <h2 class="text-lg font-semibold text-white">Event timeline</h2>
-        <div class="mt-4 space-y-4">
+      <article class="panel space-y-4">
+        <h2 class="text-base font-semibold text-body">Event timeline</h2>
+        <div class="space-y-3">
           {{range .WorkspaceDetails.Events}}
-          <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div class="flex items-center justify-between gap-3">
-              <p class="text-sm font-medium text-white">{{.Message}}</p>
-              <span class="text-xs text-slate-400">{{formatTime .CreatedAt}}</span>
+          <div class="surface-card">
+            <div class="flex items-start justify-between gap-3">
+              <p class="text-sm font-medium text-body">{{.Message}}</p>
+              <span class="text-xs text-muted">{{formatTime .CreatedAt}}</span>
             </div>
-            <p class="mt-2 text-xs uppercase tracking-[0.25em] text-slate-500">{{.EventType}}</p>
-            {{if .DetailJSON}}<p class="mt-3 break-all text-sm text-slate-300">{{.DetailJSON}}</p>{{end}}
+            <p class="mt-1 text-[11px] uppercase tracking-[0.22em] text-muted">{{.EventType}}</p>
+            {{if .DetailJSON}}<p class="mt-2 break-all text-sm text-soft">{{.DetailJSON}}</p>{{end}}
           </div>
           {{else}}
-          <p class="text-sm text-slate-400">No events yet.</p>
+          <p class="text-sm text-muted">No events yet.</p>
           {{end}}
         </div>
       </article>
@@ -138,4 +148,3 @@
 </body>
 </html>
 {{end}}
-

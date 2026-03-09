@@ -39,7 +39,7 @@ func Load() Config {
 		DBPath:                dbPath,
 		Runtime:               getenv("CHEAPSPACE_RUNTIME", "mock"),
 		PublicHost:            getenv("CHEAPSPACE_PUBLIC_HOST", "localhost"),
-		DefaultWorkspaceImage: getenv("CHEAPSPACE_DEFAULT_WORKSPACE_IMAGE", "cheapspace-workspace:latest"),
+		DefaultWorkspaceImage: getenv("CHEAPSPACE_DEFAULT_WORKSPACE_IMAGE", "ghcr.io/arika0093/cheapspace-workspace:latest"),
 		AppSecret:             getenv("CHEAPSPACE_APP_SECRET", "cheapspace-development-secret"),
 		MaxCPUMillis:          getenvInt("CHEAPSPACE_MAX_CPU_MILLIS", 8000),
 		MaxMemoryMB:           getenvInt("CHEAPSPACE_MAX_MEMORY_MB", 16384),

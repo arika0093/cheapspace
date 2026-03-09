@@ -40,10 +40,12 @@ type CreateWorkspaceInput struct {
 	SourceType          string
 	SourceRef           string
 	SSHKeys             []string
+	SSHPort             int
 	PasswordAuthEnabled bool
 	HTTPProxy           string
 	HTTPSProxy          string
 	NoProxy             string
+	ProxyPACURL         string
 	CPUMillis           int
 	MemoryMB            int
 	TTLMinutes          int
@@ -126,8 +128,8 @@ func (s *Service) RunUntilIdle(ctx context.Context, maxIterations int) error {
 	return fmt.Errorf("jobs did not become idle after %d iterations", maxIterations)
 }
 
-func (s *Service) ListWorkspaces(ctx context.Context) ([]db.Workspace, error) {
-	return s.store.ListWorkspaces(ctx)
+func (s *Service) ListWorkspaces(ctx context.Context, includeDeleted bool) ([]db.Workspace, error) {
+	return s.store.ListWorkspaces(ctx, includeDeleted)
 }
 
 func (s *Service) GetWorkspaceDetails(ctx context.Context, workspaceID string) (WorkspaceDetails, error) {
@@ -174,6 +176,16 @@ func (s *Service) CreateWorkspace(ctx context.Context, input CreateWorkspaceInpu
 	if input.SourceType == "" {
 		input.SourceType = "builtin_image"
 	}
+	if input.SourceType == "builtin_image" {
+		input.SourceRef = ""
+	}
+	input.HTTPProxy = strings.TrimSpace(input.HTTPProxy)
+	input.HTTPSProxy = strings.TrimSpace(input.HTTPSProxy)
+	if input.HTTPProxy != "" && input.HTTPSProxy == "" {
+		input.HTTPSProxy = input.HTTPProxy
+	}
+	input.NoProxy = strings.TrimSpace(input.NoProxy)
+	input.ProxyPACURL = strings.TrimSpace(input.ProxyPACURL)
 	if input.CPUMillis <= 0 {
 		input.CPUMillis = minInt(2000, s.cfg.MaxCPUMillis)
 	}
@@ -188,9 +200,7 @@ func (s *Service) CreateWorkspace(ctx context.Context, input CreateWorkspaceInpu
 	if err != nil {
 		return db.Workspace{}, err
 	}
-	if len(keys) == 0 {
-		input.PasswordAuthEnabled = true
-	}
+	input.PasswordAuthEnabled = len(keys) == 0
 
 	if err := s.validateInput(input); err != nil {
 		return db.Workspace{}, err
@@ -249,11 +259,13 @@ func (s *Service) CreateWorkspace(ctx context.Context, input CreateWorkspaceInpu
 		HTTPProxy:           strings.TrimSpace(input.HTTPProxy),
 		HTTPSProxy:          strings.TrimSpace(input.HTTPSProxy),
 		NoProxy:             strings.TrimSpace(input.NoProxy),
+		ProxyPACURL:         input.ProxyPACURL,
 		CPUMillis:           input.CPUMillis,
 		MemoryMB:            input.MemoryMB,
 		TTLMinutes:          input.TTLMinutes,
 		RuntimeKind:         s.runtime.Kind(),
 		SSHEndpointMode:     "host_port",
+		SSHPort:             input.SSHPort,
 		PasswordAuthEnabled: input.PasswordAuthEnabled,
 		PasswordHash:        passwordHash,
 		TraefikEnabled:      input.TraefikEnabled,
@@ -430,6 +442,7 @@ func (s *Service) executeBuildJob(ctx context.Context, job db.Job, control jobCo
 	if err := s.store.UpdateWorkspaceState(ctx, workspace.ID, "building", ""); err != nil {
 		return err
 	}
+	logger.Log("system", "Resolving workspace image")
 	_ = s.store.AddWorkspaceEvent(ctx, db.WorkspaceEvent{
 		ID:          randomID("evt"),
 		WorkspaceID: workspace.ID,
@@ -456,6 +469,7 @@ func (s *Service) executeBuildJob(ctx context.Context, job db.Job, control jobCo
 	if err := s.store.UpdateWorkspaceResolvedImage(ctx, workspace.ID, result.ResolvedImageRef, result.NixpacksPlanJSON); err != nil {
 		return err
 	}
+	logger.Log("system", "Workspace image ready: "+result.ResolvedImageRef)
 	if err := s.store.SetJobStatus(ctx, job.ID, "done", ""); err != nil {
 		return err
 	}
@@ -480,14 +494,16 @@ func (s *Service) executeProvisionJob(ctx context.Context, job db.Job, control j
 	if err := s.store.UpdateWorkspaceState(ctx, workspace.ID, "provisioning", ""); err != nil {
 		return err
 	}
+	logger.Log("system", "Loading workspace access configuration")
 	keys, err := s.store.ListWorkspaceSSHKeys(ctx, workspace.ID)
 	if err != nil {
 		return err
 	}
-	port, err := s.store.AllocatePort(ctx, workspace.ID, s.cfg.PortRangeStart, s.cfg.PortRangeEnd)
+	port, err := s.store.AllocatePort(ctx, workspace.ID, workspace.SSHPort, s.cfg.PortRangeStart, s.cfg.PortRangeEnd)
 	if err != nil {
 		return s.failJob(ctx, job, workspace.ID, "provision.failed", "Unable to allocate SSH port", err)
 	}
+	logger.Log("system", fmt.Sprintf("Reserved SSH host port %d", port))
 
 	password := ""
 	if workspace.PasswordAuthEnabled {
@@ -510,6 +526,7 @@ func (s *Service) executeProvisionJob(ctx context.Context, job db.Job, control j
 			resolvedImage = workspace.SourceRef
 		}
 	}
+	logger.Log("system", "Using workspace image "+resolvedImage)
 
 	authKeys := make([]string, 0, len(keys))
 	for _, key := range keys {
@@ -531,6 +548,7 @@ func (s *Service) executeProvisionJob(ctx context.Context, job db.Job, control j
 		HTTPProxy:           workspace.HTTPProxy,
 		HTTPSProxy:          workspace.HTTPSProxy,
 		NoProxy:             workspace.NoProxy,
+		ProxyPACURL:         workspace.ProxyPACURL,
 		CPUMillis:           workspace.CPUMillis,
 		MemoryMB:            workspace.MemoryMB,
 		PublicHost:          s.cfg.PublicHost,
@@ -544,6 +562,7 @@ func (s *Service) executeProvisionJob(ctx context.Context, job db.Job, control j
 		_ = s.store.ReleasePort(ctx, workspace.ID)
 		return s.failJob(ctx, job, workspace.ID, "provision.failed", "Workspace provisioning failed", err)
 	}
+	logger.Log("system", fmt.Sprintf("Workspace container is running and reachable on %s:%d", result.SSHHost, result.SSHPort))
 
 	if err := s.store.UpdateWorkspaceProvisioned(ctx, workspace.ID, "running", result.SSHHost, result.SSHPort, result.PublicHostname, result.ContainerID, result.ContainerName, result.VolumeName, result.NetworkName, time.Now().UTC(), expiresAt); err != nil {
 		return err
@@ -568,6 +587,7 @@ func (s *Service) executeDeleteJob(ctx context.Context, job db.Job, control jobC
 		_ = s.store.SetJobStatus(ctx, job.ID, "failed", err.Error())
 		return err
 	}
+	logger.Log("system", "Removing workspace container resources")
 
 	if err := s.runtime.Delete(ctx, runtime.DeleteRequest{
 		WorkspaceID:   workspace.ID,
@@ -666,6 +686,9 @@ func (s *Service) validateInput(input CreateWorkspaceInput) error {
 	}
 	if input.TTLMinutes <= 0 || input.TTLMinutes > s.cfg.MaxTTLMinutes {
 		return fmt.Errorf("ttl must be between 1 and %d minutes", s.cfg.MaxTTLMinutes)
+	}
+	if input.SSHPort != 0 && (input.SSHPort < s.cfg.PortRangeStart || input.SSHPort > s.cfg.PortRangeEnd) {
+		return fmt.Errorf("ssh port must be between %d and %d", s.cfg.PortRangeStart, s.cfg.PortRangeEnd)
 	}
 	return nil
 }

@@ -15,6 +15,7 @@ type Workspace struct {
 	HTTPProxy           string
 	HTTPSProxy          string
 	NoProxy             string
+	ProxyPACURL         string
 	CPUMillis           int
 	MemoryMB            int
 	TTLMinutes          int

@@ -104,15 +104,19 @@ VALUES(?, ?, ?, ?, ?, ?, ?)
 	return err
 }
 
-func (s *Store) ListWorkspaces(ctx context.Context) ([]Workspace, error) {
-	rows, err := s.db.QueryContext(ctx, `
+func (s *Store) ListWorkspaces(ctx context.Context, includeDeleted bool) ([]Workspace, error) {
+	query := `
 SELECT id, name, state, repo_url, dotfiles_url, source_type, source_ref, resolved_image_ref, nixpacks_plan_json,
-       http_proxy, https_proxy, no_proxy, cpu_millis, memory_mb, ttl_minutes, runtime_kind, ssh_endpoint_mode,
+       http_proxy, https_proxy, no_proxy, proxy_pac_url, cpu_millis, memory_mb, ttl_minutes, runtime_kind, ssh_endpoint_mode,
        ssh_host, ssh_port, public_hostname, password_auth_enabled, password_hash, traefik_enabled, traefik_base_domain,
        container_id, container_name, volume_name, network_name, last_error, created_at, started_at, expires_at, deleted_at
 FROM workspaces
-ORDER BY created_at DESC
-`)
+`
+	if !includeDeleted {
+		query += "WHERE deleted_at IS NULL\n"
+	}
+	query += "ORDER BY created_at DESC"
+	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +136,7 @@ ORDER BY created_at DESC
 func (s *Store) GetWorkspace(ctx context.Context, id string) (Workspace, error) {
 	row := s.db.QueryRowContext(ctx, `
 SELECT id, name, state, repo_url, dotfiles_url, source_type, source_ref, resolved_image_ref, nixpacks_plan_json,
-       http_proxy, https_proxy, no_proxy, cpu_millis, memory_mb, ttl_minutes, runtime_kind, ssh_endpoint_mode,
+       http_proxy, https_proxy, no_proxy, proxy_pac_url, cpu_millis, memory_mb, ttl_minutes, runtime_kind, ssh_endpoint_mode,
        ssh_host, ssh_port, public_hostname, password_auth_enabled, password_hash, traefik_enabled, traefik_base_domain,
        container_id, container_name, volume_name, network_name, last_error, created_at, started_at, expires_at, deleted_at
 FROM workspaces
@@ -469,7 +473,7 @@ func (s *Store) DeleteJob(ctx context.Context, jobID string) error {
 	return err
 }
 
-func (s *Store) AllocatePort(ctx context.Context, workspaceID string, rangeStart, rangeEnd int) (int, error) {
+func (s *Store) AllocatePort(ctx context.Context, workspaceID string, preferredPort, rangeStart, rangeEnd int) (int, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
@@ -480,20 +484,53 @@ func (s *Store) AllocatePort(ctx context.Context, workspaceID string, rangeStart
 		}
 	}()
 
-	for port := rangeStart; port <= rangeEnd; port++ {
-		var count int
-		if err = tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM port_leases WHERE port = ? AND released_at IS NULL`, port).Scan(&count); err != nil {
+	var existingPort int
+	existingErr := tx.QueryRowContext(ctx, `
+SELECT port
+FROM port_leases
+WHERE workspace_id = ? AND released_at IS NULL
+LIMIT 1
+`, workspaceID).Scan(&existingPort)
+	if existingErr == nil {
+		if err = tx.Commit(); err != nil {
 			return 0, err
 		}
-		if count > 0 {
-			continue
-		}
+		return existingPort, nil
+	}
+	if existingErr != nil && !errors.Is(existingErr, sql.ErrNoRows) {
+		return 0, existingErr
+	}
 
-		if _, err = tx.ExecContext(ctx, `
+	now := timestamp(time.Now())
+	for _, port := range candidatePorts(preferredPort, rangeStart, rangeEnd) {
+		var currentWorkspaceID string
+		var releasedAt sql.NullString
+		scanErr := tx.QueryRowContext(ctx, `
+SELECT workspace_id, released_at
+FROM port_leases
+WHERE port = ?
+`, port).Scan(&currentWorkspaceID, &releasedAt)
+		switch {
+		case errors.Is(scanErr, sql.ErrNoRows):
+			if _, err = tx.ExecContext(ctx, `
 INSERT INTO port_leases(port, workspace_id, leased_at, released_at)
 VALUES(?, ?, ?, NULL)
-`, port, workspaceID, timestamp(time.Now())); err != nil {
-			return 0, err
+`, port, workspaceID, now); err != nil {
+				return 0, err
+			}
+		case scanErr != nil:
+			return 0, scanErr
+		case !releasedAt.Valid && currentWorkspaceID != workspaceID:
+			continue
+		case !releasedAt.Valid && currentWorkspaceID == workspaceID:
+		default:
+			if _, err = tx.ExecContext(ctx, `
+UPDATE port_leases
+SET workspace_id = ?, leased_at = ?, released_at = NULL
+WHERE port = ?
+`, workspaceID, now, port); err != nil {
+				return 0, err
+			}
 		}
 		if err = tx.Commit(); err != nil {
 			return 0, err
@@ -501,6 +538,9 @@ VALUES(?, ?, ?, NULL)
 		return port, nil
 	}
 
+	if preferredPort > 0 {
+		return 0, fmt.Errorf("requested port %d is unavailable", preferredPort)
+	}
 	return 0, fmt.Errorf("no free ports available in %d-%d", rangeStart, rangeEnd)
 }
 
@@ -517,11 +557,11 @@ func insertWorkspace(ctx context.Context, execer execer, workspace Workspace) er
 	_, err := execer.ExecContext(ctx, `
 INSERT INTO workspaces(
     id, name, state, repo_url, dotfiles_url, source_type, source_ref, resolved_image_ref, nixpacks_plan_json,
-    http_proxy, https_proxy, no_proxy, cpu_millis, memory_mb, ttl_minutes, runtime_kind, ssh_endpoint_mode,
+    http_proxy, https_proxy, no_proxy, proxy_pac_url, cpu_millis, memory_mb, ttl_minutes, runtime_kind, ssh_endpoint_mode,
     ssh_host, ssh_port, public_hostname, password_auth_enabled, password_hash, traefik_enabled, traefik_base_domain,
     container_id, container_name, volume_name, network_name, last_error, created_at, started_at, expires_at, deleted_at
-) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-`, workspace.ID, workspace.Name, workspace.State, workspace.RepoURL, workspace.DotfilesURL, workspace.SourceType, workspace.SourceRef, workspace.ResolvedImageRef, workspace.NixpacksPlanJSON, workspace.HTTPProxy, workspace.HTTPSProxy, workspace.NoProxy, workspace.CPUMillis, workspace.MemoryMB, workspace.TTLMinutes, workspace.RuntimeKind, workspace.SSHEndpointMode, workspace.SSHHost, workspace.SSHPort, workspace.PublicHostname, boolToInt(workspace.PasswordAuthEnabled), workspace.PasswordHash, boolToInt(workspace.TraefikEnabled), workspace.TraefikBaseDomain, workspace.ContainerID, workspace.ContainerName, workspace.VolumeName, workspace.NetworkName, workspace.LastError, timestamp(workspace.CreatedAt), nullableTimestamp(workspace.StartedAt), nullableTimestamp(workspace.ExpiresAt), nullableTimestamp(workspace.DeletedAt))
+) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`, workspace.ID, workspace.Name, workspace.State, workspace.RepoURL, workspace.DotfilesURL, workspace.SourceType, workspace.SourceRef, workspace.ResolvedImageRef, workspace.NixpacksPlanJSON, workspace.HTTPProxy, workspace.HTTPSProxy, workspace.NoProxy, workspace.ProxyPACURL, workspace.CPUMillis, workspace.MemoryMB, workspace.TTLMinutes, workspace.RuntimeKind, workspace.SSHEndpointMode, workspace.SSHHost, workspace.SSHPort, workspace.PublicHostname, boolToInt(workspace.PasswordAuthEnabled), workspace.PasswordHash, boolToInt(workspace.TraefikEnabled), workspace.TraefikBaseDomain, workspace.ContainerID, workspace.ContainerName, workspace.VolumeName, workspace.NetworkName, workspace.LastError, timestamp(workspace.CreatedAt), nullableTimestamp(workspace.StartedAt), nullableTimestamp(workspace.ExpiresAt), nullableTimestamp(workspace.DeletedAt))
 	return err
 }
 
@@ -554,7 +594,7 @@ func scanWorkspace(sc scanner) (Workspace, error) {
 	var createdAt string
 	var startedAt, expiresAt, deletedAt sql.NullString
 	var passwordAuthEnabled, traefikEnabled int
-	err := sc.Scan(&item.ID, &item.Name, &item.State, &item.RepoURL, &item.DotfilesURL, &item.SourceType, &item.SourceRef, &item.ResolvedImageRef, &item.NixpacksPlanJSON, &item.HTTPProxy, &item.HTTPSProxy, &item.NoProxy, &item.CPUMillis, &item.MemoryMB, &item.TTLMinutes, &item.RuntimeKind, &item.SSHEndpointMode, &item.SSHHost, &item.SSHPort, &item.PublicHostname, &passwordAuthEnabled, &item.PasswordHash, &traefikEnabled, &item.TraefikBaseDomain, &item.ContainerID, &item.ContainerName, &item.VolumeName, &item.NetworkName, &item.LastError, &createdAt, &startedAt, &expiresAt, &deletedAt)
+	err := sc.Scan(&item.ID, &item.Name, &item.State, &item.RepoURL, &item.DotfilesURL, &item.SourceType, &item.SourceRef, &item.ResolvedImageRef, &item.NixpacksPlanJSON, &item.HTTPProxy, &item.HTTPSProxy, &item.NoProxy, &item.ProxyPACURL, &item.CPUMillis, &item.MemoryMB, &item.TTLMinutes, &item.RuntimeKind, &item.SSHEndpointMode, &item.SSHHost, &item.SSHPort, &item.PublicHostname, &passwordAuthEnabled, &item.PasswordHash, &traefikEnabled, &item.TraefikBaseDomain, &item.ContainerID, &item.ContainerName, &item.VolumeName, &item.NetworkName, &item.LastError, &createdAt, &startedAt, &expiresAt, &deletedAt)
 	if err != nil {
 		return Workspace{}, err
 	}
@@ -565,6 +605,17 @@ func scanWorkspace(sc scanner) (Workspace, error) {
 	item.ExpiresAt = parseNullableTime(expiresAt)
 	item.DeletedAt = parseNullableTime(deletedAt)
 	return item, nil
+}
+
+func candidatePorts(preferredPort, rangeStart, rangeEnd int) []int {
+	if preferredPort > 0 {
+		return []int{preferredPort}
+	}
+	candidates := make([]int, 0, rangeEnd-rangeStart+1)
+	for port := rangeStart; port <= rangeEnd; port++ {
+		candidates = append(candidates, port)
+	}
+	return candidates
 }
 
 func scanJob(sc scanner) (Job, error) {

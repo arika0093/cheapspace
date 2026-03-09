@@ -1,38 +1,50 @@
 {{define "head"}}
 <!doctype html>
-<html lang="ja" class="h-full bg-slate-950 text-slate-100">
+<html lang="ja" class="h-full" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{.Title}} - Cheapspace</title>
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("cheapspace.theme");
+        document.documentElement.dataset.theme = stored === "dark" ? "dark" : "light";
+      } catch {
+        document.documentElement.dataset.theme = "light";
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="/static/app.css">
   <script defer src="/static/app.js"></script>
 </head>
-<body class="min-h-full bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.2),_transparent_35%),linear-gradient(180deg,_#020617,_#0f172a)] text-slate-100">
+<body class="page-shell min-h-full">
 {{end}}
 
 {{define "nav"}}
-<header class="border-b border-white/10 bg-slate-950/70 backdrop-blur">
-  <div class="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-5">
-    <div>
-      <a href="/workspaces" class="text-xl font-semibold tracking-tight text-white">Cheapspace</a>
-      <p class="text-sm text-slate-400">Self-hosted developer workspace control plane</p>
+<header class="site-header">
+  <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+    <div class="min-w-0">
+      <a href="/workspaces" class="site-title">Cheapspace</a>
+      <p class="text-xs text-muted">Self-hosted developer workspace control plane</p>
     </div>
-    <nav class="flex items-center gap-3 text-sm">
-      <a class="rounded-full px-4 py-2 font-medium {{if eq .Active "workspaces"}}bg-sky-500 text-slate-950{{else}}bg-white/5 text-slate-200 hover:bg-white/10{{end}}" href="/workspaces">Workspaces</a>
-      <a class="rounded-full px-4 py-2 font-medium {{if eq .Active "jobs"}}bg-sky-500 text-slate-950{{else}}bg-white/5 text-slate-200 hover:bg-white/10{{end}}" href="/jobs">Jobs</a>
-      <a class="rounded-full bg-white/5 px-4 py-2 text-slate-300 hover:bg-white/10" href="/workspaces/new">New workspace</a>
-    </nav>
+    <div class="flex flex-wrap items-center gap-2">
+      <nav class="flex flex-wrap items-center gap-2 text-sm">
+        <a class="{{if eq .Active "workspaces"}}nav-pill nav-pill-active{{else}}nav-pill{{end}}" href="/workspaces">Workspaces</a>
+        <a class="{{if eq .Active "jobs"}}nav-pill nav-pill-active{{else}}nav-pill{{end}}" href="/jobs">Jobs</a>
+        <a class="nav-pill" href="/workspaces/new">New workspace</a>
+      </nav>
+      <button type="button" class="btn btn-secondary" data-theme-toggle aria-pressed="false">Dark mode</button>
+    </div>
   </div>
 </header>
 {{end}}
 
 {{define "footer"}}
-<footer class="border-t border-white/10 bg-slate-950/40">
-  <div class="mx-auto flex max-w-7xl flex-col gap-2 px-6 py-4 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-    <p>Runtime: <span class="font-medium text-slate-200">{{.Config.Runtime}}</span> · Default image: <span class="font-medium text-slate-200">{{.Config.DefaultWorkspaceImage}}</span></p>
-    <p>Secret fingerprint: <span class="font-medium text-slate-200">{{.SecretFingerprint}}</span></p>
+<footer class="site-footer">
+  <div class="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-3 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+    <p>Runtime: <span class="font-medium text-soft">{{.Config.Runtime}}</span> · Default image: <span class="font-medium text-soft">{{.Config.DefaultWorkspaceImage}}</span></p>
+    <p>Secret fingerprint: <span class="font-medium text-soft">{{.SecretFingerprint}}</span></p>
   </div>
 </footer>
 {{end}}
-

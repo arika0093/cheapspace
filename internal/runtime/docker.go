@@ -122,6 +122,7 @@ func (d *DockerRuntime) Provision(ctx context.Context, req ProvisionRequest, con
 	if err := d.runCommand(ctx, logger, "", d.dockerBinary, "volume", "create", volumeName); err != nil {
 		return ProvisionResult{}, err
 	}
+	logger.Log("system", fmt.Sprintf("Using workspace image %s", req.ResolvedImageRef))
 
 	args := []string{
 		"create",
@@ -145,6 +146,7 @@ func (d *DockerRuntime) Provision(ctx context.Context, req ProvisionRequest, con
 		args = append(args, "-l", fmt.Sprintf("%s=%s", key, value))
 	}
 	args = append(args, req.ResolvedImageRef)
+	logger.Log("system", fmt.Sprintf("Creating container %s", containerName))
 
 	var output bytes.Buffer
 	if err := d.runCommandToBuffer(ctx, logger, &output, "", d.dockerBinary, args...); err != nil {
@@ -159,6 +161,7 @@ func (d *DockerRuntime) Provision(ctx context.Context, req ProvisionRequest, con
 		return ProvisionResult{}, ErrCancelled
 	}
 
+	logger.Log("system", fmt.Sprintf("Starting container %s", containerName))
 	if err := d.runCommand(ctx, logger, "", d.dockerBinary, "start", containerName); err != nil {
 		return ProvisionResult{}, err
 	}
@@ -205,6 +208,10 @@ func (d *DockerRuntime) runCommandToBuffer(ctx context.Context, logger Logger, o
 
 	if err := cmd.Run(); err != nil {
 		scanLogs(logger, combined.Bytes())
+		message := strings.TrimSpace(combined.String())
+		if message != "" {
+			return fmt.Errorf("%s %s: %s: %w", binary, strings.Join(args, " "), message, err)
+		}
 		return fmt.Errorf("%s %s: %w", binary, strings.Join(args, " "), err)
 	}
 
@@ -222,6 +229,7 @@ func provisionEnv(req ProvisionRequest) []string {
 		"CHEAPSPACE_HTTP_PROXY=" + req.HTTPProxy,
 		"CHEAPSPACE_HTTPS_PROXY=" + req.HTTPSProxy,
 		"CHEAPSPACE_NO_PROXY=" + req.NoProxy,
+		"CHEAPSPACE_PROXY_PAC_URL=" + req.ProxyPACURL,
 		"CHEAPSPACE_AUTHORIZED_KEYS=" + strings.Join(req.AuthorizedKeys, "\n"),
 		"CHEAPSPACE_PASSWORD_AUTH_ENABLED=" + boolString(req.PasswordAuthEnabled),
 		"CHEAPSPACE_PASSWORD=" + req.Password,

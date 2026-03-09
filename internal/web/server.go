@@ -31,6 +31,7 @@ type viewData struct {
 	Notice                   string
 	Config                   config.Config
 	SecretFingerprint        string
+	ShowDeleted              bool
 	Form                     workspaceForm
 	Workspaces               []db.Workspace
 	WorkspaceDetails         service.WorkspaceDetails
@@ -47,10 +48,12 @@ type workspaceForm struct {
 	SourceType          string
 	SourceRef           string
 	SSHKeys             string
+	SSHPort             int
 	PasswordAuthEnabled bool
 	HTTPProxy           string
 	HTTPSProxy          string
 	NoProxy             string
+	ProxyPACURL         string
 	CPUMillis           int
 	MemoryMB            int
 	TTLMinutes          int
@@ -147,7 +150,8 @@ func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleWorkspaces(w http.ResponseWriter, r *http.Request) {
-	workspaces, err := s.service.ListWorkspaces(r.Context())
+	showDeleted := queryEnabled(r.URL.Query().Get("show_deleted"))
+	workspaces, err := s.service.ListWorkspaces(r.Context(), showDeleted)
 	if err != nil {
 		s.renderError(w, err, http.StatusInternalServerError)
 		return
@@ -157,6 +161,7 @@ func (s *Server) handleWorkspaces(w http.ResponseWriter, r *http.Request) {
 		Active:            "workspaces",
 		Config:            s.cfg,
 		SecretFingerprint: s.cfg.SecretFingerprint(),
+		ShowDeleted:       showDeleted,
 		Workspaces:        workspaces,
 	})
 }
@@ -169,6 +174,7 @@ func (s *Server) handleWorkspaceNew(w http.ResponseWriter, r *http.Request) {
 		SecretFingerprint: s.cfg.SecretFingerprint(),
 		Form: workspaceForm{
 			SourceType: "builtin_image",
+			NoProxy:    defaultNoProxyValue(),
 			CPUMillis:  minInt(2000, s.cfg.MaxCPUMillis),
 			MemoryMB:   minInt(4096, s.cfg.MaxMemoryMB),
 			TTLMinutes: minInt(480, s.cfg.MaxTTLMinutes),
@@ -183,39 +189,47 @@ func (s *Server) handleWorkspaceCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	form := workspaceForm{
-		Name:                strings.TrimSpace(r.FormValue("name")),
-		RepoURL:             strings.TrimSpace(r.FormValue("repo_url")),
-		DotfilesURL:         strings.TrimSpace(r.FormValue("dotfiles_url")),
-		SourceType:          strings.TrimSpace(r.FormValue("source_type")),
-		SourceRef:           r.FormValue("source_ref"),
-		SSHKeys:             r.FormValue("ssh_keys"),
-		PasswordAuthEnabled: r.FormValue("password_auth_enabled") == "on",
-		HTTPProxy:           strings.TrimSpace(r.FormValue("http_proxy")),
-		HTTPSProxy:          strings.TrimSpace(r.FormValue("https_proxy")),
-		NoProxy:             strings.TrimSpace(r.FormValue("no_proxy")),
-		CPUMillis:           atoiDefault(r.FormValue("cpu_millis"), minInt(2000, s.cfg.MaxCPUMillis)),
-		MemoryMB:            atoiDefault(r.FormValue("memory_mb"), minInt(4096, s.cfg.MaxMemoryMB)),
-		TTLMinutes:          atoiDefault(r.FormValue("ttl_minutes"), minInt(480, s.cfg.MaxTTLMinutes)),
-		TraefikEnabled:      r.FormValue("traefik_enabled") == "on",
-		TraefikBaseDomain:   strings.TrimSpace(r.FormValue("traefik_base_domain")),
+		Name:              strings.TrimSpace(r.FormValue("name")),
+		RepoURL:           strings.TrimSpace(r.FormValue("repo_url")),
+		DotfilesURL:       strings.TrimSpace(r.FormValue("dotfiles_url")),
+		SourceType:        strings.TrimSpace(r.FormValue("source_type")),
+		SourceRef:         r.FormValue("source_ref"),
+		SSHKeys:           r.FormValue("ssh_keys"),
+		SSHPort:           atoiDefault(r.FormValue("ssh_port"), 0),
+		HTTPProxy:         strings.TrimSpace(r.FormValue("http_proxy")),
+		HTTPSProxy:        strings.TrimSpace(r.FormValue("https_proxy")),
+		NoProxy:           strings.TrimSpace(r.FormValue("no_proxy")),
+		ProxyPACURL:       strings.TrimSpace(r.FormValue("proxy_pac_url")),
+		CPUMillis:         atoiDefault(r.FormValue("cpu_millis"), minInt(2000, s.cfg.MaxCPUMillis)),
+		MemoryMB:          atoiDefault(r.FormValue("memory_mb"), minInt(4096, s.cfg.MaxMemoryMB)),
+		TTLMinutes:        atoiDefault(r.FormValue("ttl_minutes"), minInt(480, s.cfg.MaxTTLMinutes)),
+		TraefikEnabled:    r.FormValue("traefik_enabled") == "on",
+		TraefikBaseDomain: strings.TrimSpace(r.FormValue("traefik_base_domain")),
+	}
+	if form.SourceType == "builtin_image" {
+		form.SourceRef = ""
+	}
+	if form.HTTPProxy != "" && form.HTTPSProxy == "" {
+		form.HTTPSProxy = form.HTTPProxy
 	}
 
 	workspace, err := s.service.CreateWorkspace(r.Context(), service.CreateWorkspaceInput{
-		Name:                form.Name,
-		RepoURL:             form.RepoURL,
-		DotfilesURL:         form.DotfilesURL,
-		SourceType:          form.SourceType,
-		SourceRef:           form.SourceRef,
-		SSHKeys:             []string{form.SSHKeys},
-		PasswordAuthEnabled: form.PasswordAuthEnabled,
-		HTTPProxy:           form.HTTPProxy,
-		HTTPSProxy:          form.HTTPSProxy,
-		NoProxy:             form.NoProxy,
-		CPUMillis:           form.CPUMillis,
-		MemoryMB:            form.MemoryMB,
-		TTLMinutes:          form.TTLMinutes,
-		TraefikEnabled:      form.TraefikEnabled,
-		TraefikBaseDomain:   form.TraefikBaseDomain,
+		Name:              form.Name,
+		RepoURL:           form.RepoURL,
+		DotfilesURL:       form.DotfilesURL,
+		SourceType:        form.SourceType,
+		SourceRef:         form.SourceRef,
+		SSHKeys:           []string{form.SSHKeys},
+		SSHPort:           form.SSHPort,
+		HTTPProxy:         form.HTTPProxy,
+		HTTPSProxy:        form.HTTPSProxy,
+		NoProxy:           form.NoProxy,
+		ProxyPACURL:       form.ProxyPACURL,
+		CPUMillis:         form.CPUMillis,
+		MemoryMB:          form.MemoryMB,
+		TTLMinutes:        form.TTLMinutes,
+		TraefikEnabled:    form.TraefikEnabled,
+		TraefikBaseDomain: form.TraefikBaseDomain,
 	})
 	if err != nil {
 		s.render(w, "workspace_new", viewData{
@@ -431,6 +445,19 @@ func minInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func queryEnabled(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "on", "yes":
+		return true
+	default:
+		return false
+	}
+}
+
+func defaultNoProxyValue() string {
+	return "localhost,127.0.0.1,::1,host.docker.internal"
 }
 
 func ServerContext(ctx context.Context, handler http.Handler) error {

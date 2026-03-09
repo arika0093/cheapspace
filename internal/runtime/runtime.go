@@ -46,6 +46,7 @@ type ProvisionRequest struct {
 	HTTPProxy           string
 	HTTPSProxy          string
 	NoProxy             string
+	ProxyPACURL         string
 	CPUMillis           int
 	MemoryMB            int
 	PublicHost          string

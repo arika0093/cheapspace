@@ -1,108 +1,135 @@
 {{define "workspace_new"}}
 {{template "head" .}}
 {{template "nav" .}}
-<main class="mx-auto max-w-5xl px-6 py-8">
-  <div class="mb-8">
-    <p class="text-sm uppercase tracking-[0.3em] text-sky-300">Provisioning</p>
-    <h1 class="mt-2 text-3xl font-semibold tracking-tight text-white">Create a workspace</h1>
-    <p class="mt-2 max-w-3xl text-sm text-slate-300">Choose a built-in image, direct image reference, manual Dockerfile, or Nixpacks build. SSH keys can be entered one per line; password login is offered as a fallback.</p>
-  </div>
+<main class="mx-auto max-w-6xl px-4 py-6">
+  <section class="panel panel-hero mb-4">
+    <p class="section-eyebrow">Provisioning</p>
+    <h1 class="mt-1 text-2xl font-semibold tracking-tight text-body">Create a workspace</h1>
+    <p class="mt-2 max-w-4xl text-sm text-muted">Choose a built-in image, direct image reference, manual Dockerfile, or Nixpacks build. Password login is generated automatically only when no SSH public keys are supplied.</p>
+  </section>
 
   {{if .Error}}
-  <div class="mb-6 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">{{.Error}}</div>
+  <div class="alert alert-error mb-4">{{.Error}}</div>
   {{end}}
 
-  <form method="post" action="/workspaces" class="space-y-8" data-workspace-form>
-    <section class="grid gap-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-slate-950/30 lg:grid-cols-2">
-      <div class="space-y-5">
-        <div>
-          <label class="mb-2 block text-sm font-medium text-slate-200">Display name</label>
-          <input type="text" name="name" value="{{.Form.Name}}" class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400 focus:outline-none" placeholder="Optional friendly name">
+  <form method="post" action="/workspaces" class="space-y-4" data-workspace-form>
+    <section class="grid gap-4 xl:grid-cols-[1.15fr,0.85fr]">
+      <article class="panel space-y-4">
+        <div class="grid gap-4 lg:grid-cols-2">
+          <div class="space-y-2">
+            <label class="label">Display name</label>
+            <input type="text" name="name" value="{{.Form.Name}}" class="form-field" placeholder="Optional friendly name">
+          </div>
+          <div class="space-y-2">
+            <label class="label">Environment source</label>
+            <select name="source_type" class="form-field" data-source-selector>
+              <option value="builtin_image" {{if eq .Form.SourceType "builtin_image"}}selected{{end}}>Built-in image</option>
+              <option value="image_ref" {{if eq .Form.SourceType "image_ref"}}selected{{end}}>Image reference</option>
+              <option value="dockerfile" {{if eq .Form.SourceType "dockerfile"}}selected{{end}}>Manual Dockerfile</option>
+              <option value="nixpacks" {{if eq .Form.SourceType "nixpacks"}}selected{{end}}>Nixpacks</option>
+            </select>
+          </div>
         </div>
-        <div>
-          <label class="mb-2 block text-sm font-medium text-slate-200">Repository URL</label>
-          <input type="text" name="repo_url" value="{{.Form.RepoURL}}" class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400 focus:outline-none" placeholder="https://github.com/owner/repo.git">
-        </div>
-        <div>
-          <label class="mb-2 block text-sm font-medium text-slate-200">Dotfiles URL</label>
-          <input type="text" name="dotfiles_url" value="{{.Form.DotfilesURL}}" class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400 focus:outline-none" placeholder="https://github.com/owner/dotfiles.git">
-        </div>
-        <div>
-          <label class="mb-2 block text-sm font-medium text-slate-200">Environment source</label>
-          <select name="source_type" class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400 focus:outline-none" data-source-selector>
-            <option value="builtin_image" {{if eq .Form.SourceType "builtin_image"}}selected{{end}}>Built-in image</option>
-            <option value="image_ref" {{if eq .Form.SourceType "image_ref"}}selected{{end}}>Image reference</option>
-            <option value="dockerfile" {{if eq .Form.SourceType "dockerfile"}}selected{{end}}>Manual Dockerfile</option>
-            <option value="nixpacks" {{if eq .Form.SourceType "nixpacks"}}selected{{end}}>Nixpacks</option>
-          </select>
-          <p class="mt-2 text-xs text-slate-500">Nixpacks requires a repository URL; Dockerfile mode accepts raw Dockerfile text.</p>
-        </div>
-      </div>
 
-      <div class="space-y-5">
-        <div data-source-panel="image_ref">
-          <label class="mb-2 block text-sm font-medium text-slate-200">Image reference / Dockerfile / Nixpacks notes</label>
-          <textarea name="source_ref" rows="12" class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400 focus:outline-none" placeholder="For image_ref: ghcr.io/acme/dev:latest&#10;&#10;For Dockerfile: paste Dockerfile text here.">{{.Form.SourceRef}}</textarea>
+        <div class="grid gap-4 lg:grid-cols-2">
+          <div class="space-y-2">
+            <label class="label">Repository URL</label>
+            <input type="text" name="repo_url" value="{{.Form.RepoURL}}" class="form-field" placeholder="https://github.com/owner/repo.git">
+          </div>
+          <div class="space-y-2">
+            <label class="label">Dotfiles URL</label>
+            <input type="text" name="dotfiles_url" value="{{.Form.DotfilesURL}}" class="form-field" placeholder="https://github.com/owner/dotfiles.git">
+          </div>
         </div>
-        <div>
-          <label class="mb-2 block text-sm font-medium text-slate-200">SSH public keys</label>
-          <textarea name="ssh_keys" rows="8" class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400 focus:outline-none" placeholder="ssh-ed25519 AAAAC3Nza... user@example">{{.Form.SSHKeys}}</textarea>
-          <p class="mt-2 text-xs text-slate-500">Enter one key per line. Leave blank to rely on password login.</p>
+
+        <div class="space-y-2 {{if eq .Form.SourceType "builtin_image"}}hidden{{end}}" data-source-panel="source_ref">
+          <div class="flex items-center justify-between gap-3">
+            <label class="label" data-source-ref-label>Image reference / Dockerfile / Nixpacks notes</label>
+            <span class="text-xs text-muted" data-source-ref-help>Nixpacks requires a repository URL.</span>
+          </div>
+          <textarea name="source_ref" rows="12" class="form-field font-mono text-xs" placeholder="ghcr.io/acme/dev:latest">{{.Form.SourceRef}}</textarea>
         </div>
-        <label class="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-200">
-          <input type="checkbox" name="password_auth_enabled" class="h-4 w-4 rounded border-white/20 bg-slate-900 text-sky-400 focus:ring-sky-400" {{if .Form.PasswordAuthEnabled}}checked{{end}}>
-          <span>Enable password fallback (one-time reveal in details page)</span>
-        </label>
-      </div>
+      </article>
+
+      <article class="panel space-y-4">
+        <div class="space-y-2">
+          <label class="label">SSH public keys</label>
+          <textarea name="ssh_keys" rows="9" class="form-field font-mono text-xs" placeholder="ssh-ed25519 AAAAC3Nza... user@example" data-ssh-keys>{{.Form.SSHKeys}}</textarea>
+          <p class="text-xs text-muted" data-password-note>{{if .Form.SSHKeys}}SSH keys detected. No password will be generated.{{else}}No SSH keys provided. A one-time initial password will be generated automatically.{{end}}</p>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="space-y-2">
+            <label class="label">SSH host port</label>
+            <input type="number" name="ssh_port" value="{{if gt .Form.SSHPort 0}}{{.Form.SSHPort}}{{end}}" min="{{.Config.PortRangeStart}}" max="{{.Config.PortRangeEnd}}" class="form-field" placeholder="{{.Config.PortRangeStart}}">
+            <p class="text-xs text-muted">Allowed range: {{.Config.PortRangeStart}}-{{.Config.PortRangeEnd}}. Leave blank to auto-assign.</p>
+          </div>
+          <div class="space-y-2">
+            <label class="label">Server auto shutdown after (minutes)</label>
+            <input type="number" name="ttl_minutes" value="{{.Form.TTLMinutes}}" class="form-field">
+            <p class="text-xs text-muted">Maximum configured by the server: {{.Config.MaxTTLMinutes}} minutes.</p>
+          </div>
+        </div>
+      </article>
     </section>
 
-    <section class="grid gap-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-slate-950/30 lg:grid-cols-2">
-      <div class="space-y-5">
-        <h2 class="text-lg font-semibold text-white">Runtime limits</h2>
-        <div class="grid gap-4 sm:grid-cols-3">
-          <div>
-            <label class="mb-2 block text-sm font-medium text-slate-200">CPU (millicores)</label>
-            <input type="number" name="cpu_millis" value="{{.Form.CPUMillis}}" class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400 focus:outline-none">
-          </div>
-          <div>
-            <label class="mb-2 block text-sm font-medium text-slate-200">Memory (MB)</label>
-            <input type="number" name="memory_mb" value="{{.Form.MemoryMB}}" class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400 focus:outline-none">
-          </div>
-          <div>
-            <label class="mb-2 block text-sm font-medium text-slate-200">TTL (minutes)</label>
-            <input type="number" name="ttl_minutes" value="{{.Form.TTLMinutes}}" class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400 focus:outline-none">
-          </div>
-        </div>
-      </div>
-      <div class="space-y-5">
-        <h2 class="text-lg font-semibold text-white">Proxy & ingress</h2>
+    <section class="grid gap-4 xl:grid-cols-2">
+      <article class="panel space-y-4">
         <div>
-          <label class="mb-2 block text-sm font-medium text-slate-200">HTTP_PROXY</label>
-          <input type="text" name="http_proxy" value="{{.Form.HTTPProxy}}" class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400 focus:outline-none">
+          <h2 class="text-base font-semibold text-body">Runtime limits</h2>
+          <p class="mt-1 text-sm text-muted">CPU and memory are applied when the Docker runtime creates the workspace container.</p>
         </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div class="space-y-2">
+            <label class="label">CPU (millicores)</label>
+            <input type="number" name="cpu_millis" value="{{.Form.CPUMillis}}" class="form-field">
+          </div>
+          <div class="space-y-2">
+            <label class="label">Memory (MB)</label>
+            <input type="number" name="memory_mb" value="{{.Form.MemoryMB}}" class="form-field">
+          </div>
+        </div>
+      </article>
+
+      <article class="panel space-y-4">
         <div>
-          <label class="mb-2 block text-sm font-medium text-slate-200">HTTPS_PROXY</label>
-          <input type="text" name="https_proxy" value="{{.Form.HTTPSProxy}}" class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400 focus:outline-none">
+          <h2 class="text-base font-semibold text-body">Proxy & ingress</h2>
+          <p class="mt-1 text-sm text-muted">HTTP proxy values mirror to HTTPS only when HTTPS is left blank. The reverse direction is ignored.</p>
         </div>
-        <div>
-          <label class="mb-2 block text-sm font-medium text-slate-200">NO_PROXY</label>
-          <input type="text" name="no_proxy" value="{{.Form.NoProxy}}" class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400 focus:outline-none">
+        <div class="grid gap-4">
+          <div class="space-y-2">
+            <label class="label">HTTP_PROXY</label>
+            <input type="text" name="http_proxy" value="{{.Form.HTTPProxy}}" class="form-field" data-http-proxy>
+          </div>
+          <div class="space-y-2">
+            <label class="label">HTTPS_PROXY</label>
+            <input type="text" name="https_proxy" value="{{.Form.HTTPSProxy}}" class="form-field" data-https-proxy>
+          </div>
+          <div class="space-y-2">
+            <label class="label">NO_PROXY</label>
+            <input type="text" name="no_proxy" value="{{.Form.NoProxy}}" class="form-field">
+          </div>
+          <div class="space-y-2">
+            <label class="label">proxy.pac URL</label>
+            <input type="url" name="proxy_pac_url" value="{{.Form.ProxyPACURL}}" class="form-field" placeholder="https://example.com/proxy.pac" data-proxy-pac>
+            <p class="text-xs text-muted">Saved in this browser and forwarded into the workspace as <code class="code-inline">PROXY_PAC_URL</code>.</p>
+          </div>
+          <div class="grid gap-4 md:grid-cols-[auto,1fr] md:items-center">
+            <label class="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-soft)] px-3 py-2 text-sm text-soft">
+              <input type="checkbox" name="traefik_enabled" class="h-4 w-4 accent-sky-500" {{if .Form.TraefikEnabled}}checked{{end}}>
+              <span>Generate Traefik labels</span>
+            </label>
+            <input type="text" name="traefik_base_domain" value="{{.Form.TraefikBaseDomain}}" class="form-field" placeholder="127.0.0.1.sslip.io">
+          </div>
         </div>
-        <div class="grid gap-4 sm:grid-cols-[auto,1fr] sm:items-center">
-          <label class="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-200">
-            <input type="checkbox" name="traefik_enabled" class="h-4 w-4 rounded border-white/20 bg-slate-900 text-sky-400 focus:ring-sky-400" {{if .Form.TraefikEnabled}}checked{{end}}>
-            <span>Generate Traefik labels</span>
-          </label>
-          <input type="text" name="traefik_base_domain" value="{{.Form.TraefikBaseDomain}}" class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400 focus:outline-none" placeholder="127.0.0.1.sslip.io">
-        </div>
-      </div>
+      </article>
     </section>
 
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <p class="text-sm text-slate-400">The server will queue build/provisioning jobs immediately after creation.</p>
-      <div class="flex gap-3">
-        <a href="/workspaces" class="inline-flex items-center rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10">Cancel</a>
-        <button type="submit" class="inline-flex items-center rounded-2xl bg-sky-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-300">Queue workspace</button>
+      <p class="text-sm text-muted">The server queues build and provisioning jobs immediately after creation.</p>
+      <div class="flex flex-wrap gap-2">
+        <a href="/workspaces" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary">Queue workspace</button>
       </div>
     </div>
   </form>
@@ -111,4 +138,3 @@
 </body>
 </html>
 {{end}}
-
