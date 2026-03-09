@@ -46,6 +46,7 @@
             <td class="px-4 py-3 align-top">
               <a href="/workspaces/{{.ID}}" class="font-medium text-body hover:text-sky-600">{{.Name}}</a>
               <div class="mt-1 text-xs text-muted">{{if .RepoURL}}{{truncate .RepoURL 72}}{{else}}No repository configured{{end}}</div>
+              {{if .RepoBranch}}<div class="mt-1 text-xs text-muted">Branch: {{.RepoBranch}}</div>{{end}}
             </td>
             <td class="px-4 py-3 align-top">
               <span class="status-pill {{statusClass .State}}">{{.State}}</span>
@@ -53,7 +54,7 @@
             </td>
             <td class="px-4 py-3 align-top text-soft">{{sourceLabel .SourceType}}</td>
             <td class="px-4 py-3 align-top text-soft">
-              {{if gt .SSHPort 0}}
+              {{if and (gt .SSHPort 0) .SSHHost}}
               <code class="code-chip">ssh -p {{.SSHPort}} codespace@{{.SSHHost}}</code>
               {{else}}
               <span class="text-muted">Pending</span>

@@ -13,6 +13,8 @@ import (
 	"strings"
 )
 
+const workspaceSSHContainerPort = 2222
+
 type DockerRuntime struct {
 	dockerBinary     string
 	gitBinary        string
@@ -85,7 +87,12 @@ func (d *DockerRuntime) buildWithNixpacks(ctx context.Context, req BuildRequest,
 	defer os.RemoveAll(tmpDir)
 
 	appDir := filepath.Join(tmpDir, "repo")
-	if err := d.runCommand(ctx, logger, tmpDir, d.gitBinary, "clone", "--depth", "1", req.RepoURL, appDir); err != nil {
+	cloneArgs := []string{"clone"}
+	if strings.TrimSpace(req.RepoBranch) != "" {
+		cloneArgs = append(cloneArgs, "--branch", strings.TrimSpace(req.RepoBranch))
+	}
+	cloneArgs = append(cloneArgs, req.RepoURL, appDir)
+	if err := d.runCommand(ctx, logger, tmpDir, d.gitBinary, cloneArgs...); err != nil {
 		return BuildResult{}, err
 	}
 
@@ -127,7 +134,7 @@ func (d *DockerRuntime) Provision(ctx context.Context, req ProvisionRequest, con
 	args := []string{
 		"create",
 		"--name", containerName,
-		"-p", fmt.Sprintf("%d:22", req.SSHPort),
+		"-p", fmt.Sprintf("%d:%d", req.SSHPort, workspaceSSHContainerPort),
 		"-v", fmt.Sprintf("%s:/workspaces", volumeName),
 	}
 	if req.CPUMillis > 0 {
@@ -225,6 +232,7 @@ func (d *DockerRuntime) runCommandToBuffer(ctx context.Context, logger Logger, o
 func provisionEnv(req ProvisionRequest) []string {
 	values := []string{
 		"CHEAPSPACE_REPO_URL=" + req.RepoURL,
+		"CHEAPSPACE_REPO_BRANCH=" + req.RepoBranch,
 		"CHEAPSPACE_DOTFILES_URL=" + req.DotfilesURL,
 		"CHEAPSPACE_HTTP_PROXY=" + req.HTTPProxy,
 		"CHEAPSPACE_HTTPS_PROXY=" + req.HTTPSProxy,

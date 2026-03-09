@@ -46,7 +46,7 @@
   }
 
   * {
-    @apply border-slate-200 dark:border-slate-800;
+    @apply border-slate-200;
   }
 
   body {
@@ -266,6 +266,56 @@
     font-size: 0.72rem;
     font-weight: 700;
     padding: 0.2rem 0.55rem;
+  }
+
+  .status-running {
+    background: rgba(16, 185, 129, 0.14);
+    box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.2);
+    color: #047857;
+  }
+
+  .status-pending {
+    background: rgba(14, 165, 233, 0.14);
+    box-shadow: inset 0 0 0 1px rgba(14, 165, 233, 0.2);
+    color: #0369a1;
+  }
+
+  .status-warning {
+    background: rgba(245, 158, 11, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.22);
+    color: #b45309;
+  }
+
+  .status-error {
+    background: rgba(244, 63, 94, 0.14);
+    box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.2);
+    color: #be123c;
+  }
+
+  .status-neutral {
+    background: rgba(148, 163, 184, 0.14);
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.2);
+    color: #475569;
+  }
+
+  :root[data-theme="dark"] .status-running {
+    color: #6ee7b7;
+  }
+
+  :root[data-theme="dark"] .status-pending {
+    color: #7dd3fc;
+  }
+
+  :root[data-theme="dark"] .status-warning {
+    color: #fcd34d;
+  }
+
+  :root[data-theme="dark"] .status-error {
+    color: #fda4af;
+  }
+
+  :root[data-theme="dark"] .status-neutral {
+    color: #cbd5e1;
   }
 
   .code-chip,

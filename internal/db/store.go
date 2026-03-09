@@ -107,7 +107,7 @@ VALUES(?, ?, ?, ?, ?, ?, ?)
 func (s *Store) ListWorkspaces(ctx context.Context, includeDeleted bool) ([]Workspace, error) {
 	query := `
 SELECT id, name, state, repo_url, dotfiles_url, source_type, source_ref, resolved_image_ref, nixpacks_plan_json,
-       http_proxy, https_proxy, no_proxy, proxy_pac_url, cpu_millis, memory_mb, ttl_minutes, runtime_kind, ssh_endpoint_mode,
+       repo_branch, http_proxy, https_proxy, no_proxy, proxy_pac_url, cpu_millis, memory_mb, ttl_minutes, runtime_kind, ssh_endpoint_mode,
        ssh_host, ssh_port, public_hostname, password_auth_enabled, password_hash, traefik_enabled, traefik_base_domain,
        container_id, container_name, volume_name, network_name, last_error, created_at, started_at, expires_at, deleted_at
 FROM workspaces
@@ -136,7 +136,7 @@ FROM workspaces
 func (s *Store) GetWorkspace(ctx context.Context, id string) (Workspace, error) {
 	row := s.db.QueryRowContext(ctx, `
 SELECT id, name, state, repo_url, dotfiles_url, source_type, source_ref, resolved_image_ref, nixpacks_plan_json,
-       http_proxy, https_proxy, no_proxy, proxy_pac_url, cpu_millis, memory_mb, ttl_minutes, runtime_kind, ssh_endpoint_mode,
+       repo_branch, http_proxy, https_proxy, no_proxy, proxy_pac_url, cpu_millis, memory_mb, ttl_minutes, runtime_kind, ssh_endpoint_mode,
        ssh_host, ssh_port, public_hostname, password_auth_enabled, password_hash, traefik_enabled, traefik_base_domain,
        container_id, container_name, volume_name, network_name, last_error, created_at, started_at, expires_at, deleted_at
 FROM workspaces
@@ -557,11 +557,11 @@ func insertWorkspace(ctx context.Context, execer execer, workspace Workspace) er
 	_, err := execer.ExecContext(ctx, `
 INSERT INTO workspaces(
     id, name, state, repo_url, dotfiles_url, source_type, source_ref, resolved_image_ref, nixpacks_plan_json,
-    http_proxy, https_proxy, no_proxy, proxy_pac_url, cpu_millis, memory_mb, ttl_minutes, runtime_kind, ssh_endpoint_mode,
+    repo_branch, http_proxy, https_proxy, no_proxy, proxy_pac_url, cpu_millis, memory_mb, ttl_minutes, runtime_kind, ssh_endpoint_mode,
     ssh_host, ssh_port, public_hostname, password_auth_enabled, password_hash, traefik_enabled, traefik_base_domain,
     container_id, container_name, volume_name, network_name, last_error, created_at, started_at, expires_at, deleted_at
-) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-`, workspace.ID, workspace.Name, workspace.State, workspace.RepoURL, workspace.DotfilesURL, workspace.SourceType, workspace.SourceRef, workspace.ResolvedImageRef, workspace.NixpacksPlanJSON, workspace.HTTPProxy, workspace.HTTPSProxy, workspace.NoProxy, workspace.ProxyPACURL, workspace.CPUMillis, workspace.MemoryMB, workspace.TTLMinutes, workspace.RuntimeKind, workspace.SSHEndpointMode, workspace.SSHHost, workspace.SSHPort, workspace.PublicHostname, boolToInt(workspace.PasswordAuthEnabled), workspace.PasswordHash, boolToInt(workspace.TraefikEnabled), workspace.TraefikBaseDomain, workspace.ContainerID, workspace.ContainerName, workspace.VolumeName, workspace.NetworkName, workspace.LastError, timestamp(workspace.CreatedAt), nullableTimestamp(workspace.StartedAt), nullableTimestamp(workspace.ExpiresAt), nullableTimestamp(workspace.DeletedAt))
+) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`, workspace.ID, workspace.Name, workspace.State, workspace.RepoURL, workspace.DotfilesURL, workspace.SourceType, workspace.SourceRef, workspace.ResolvedImageRef, workspace.NixpacksPlanJSON, workspace.RepoBranch, workspace.HTTPProxy, workspace.HTTPSProxy, workspace.NoProxy, workspace.ProxyPACURL, workspace.CPUMillis, workspace.MemoryMB, workspace.TTLMinutes, workspace.RuntimeKind, workspace.SSHEndpointMode, workspace.SSHHost, workspace.SSHPort, workspace.PublicHostname, boolToInt(workspace.PasswordAuthEnabled), workspace.PasswordHash, boolToInt(workspace.TraefikEnabled), workspace.TraefikBaseDomain, workspace.ContainerID, workspace.ContainerName, workspace.VolumeName, workspace.NetworkName, workspace.LastError, timestamp(workspace.CreatedAt), nullableTimestamp(workspace.StartedAt), nullableTimestamp(workspace.ExpiresAt), nullableTimestamp(workspace.DeletedAt))
 	return err
 }
 
@@ -594,7 +594,7 @@ func scanWorkspace(sc scanner) (Workspace, error) {
 	var createdAt string
 	var startedAt, expiresAt, deletedAt sql.NullString
 	var passwordAuthEnabled, traefikEnabled int
-	err := sc.Scan(&item.ID, &item.Name, &item.State, &item.RepoURL, &item.DotfilesURL, &item.SourceType, &item.SourceRef, &item.ResolvedImageRef, &item.NixpacksPlanJSON, &item.HTTPProxy, &item.HTTPSProxy, &item.NoProxy, &item.ProxyPACURL, &item.CPUMillis, &item.MemoryMB, &item.TTLMinutes, &item.RuntimeKind, &item.SSHEndpointMode, &item.SSHHost, &item.SSHPort, &item.PublicHostname, &passwordAuthEnabled, &item.PasswordHash, &traefikEnabled, &item.TraefikBaseDomain, &item.ContainerID, &item.ContainerName, &item.VolumeName, &item.NetworkName, &item.LastError, &createdAt, &startedAt, &expiresAt, &deletedAt)
+	err := sc.Scan(&item.ID, &item.Name, &item.State, &item.RepoURL, &item.DotfilesURL, &item.SourceType, &item.SourceRef, &item.ResolvedImageRef, &item.NixpacksPlanJSON, &item.RepoBranch, &item.HTTPProxy, &item.HTTPSProxy, &item.NoProxy, &item.ProxyPACURL, &item.CPUMillis, &item.MemoryMB, &item.TTLMinutes, &item.RuntimeKind, &item.SSHEndpointMode, &item.SSHHost, &item.SSHPort, &item.PublicHostname, &passwordAuthEnabled, &item.PasswordHash, &traefikEnabled, &item.TraefikBaseDomain, &item.ContainerID, &item.ContainerName, &item.VolumeName, &item.NetworkName, &item.LastError, &createdAt, &startedAt, &expiresAt, &deletedAt)
 	if err != nil {
 		return Workspace{}, err
 	}

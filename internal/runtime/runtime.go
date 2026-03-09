@@ -21,6 +21,7 @@ type BuildRequest struct {
 	SourceType     string
 	SourceRef      string
 	RepoURL        string
+	RepoBranch     string
 	DotfilesURL    string
 	DefaultImage   string
 	PublicHost     string
@@ -39,6 +40,7 @@ type ProvisionRequest struct {
 	SourceRef           string
 	ResolvedImageRef    string
 	RepoURL             string
+	RepoBranch          string
 	DotfilesURL         string
 	AuthorizedKeys      []string
 	Password            string

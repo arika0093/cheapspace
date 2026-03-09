@@ -7,11 +7,13 @@ services:
       CHEAPSPACE_ADDR: 0.0.0.0:8080
       CHEAPSPACE_DATA_DIR: /data
       CHEAPSPACE_RUNTIME: docker
-      CHEAPSPACE_PUBLIC_HOST: localhost
+      CHEAPSPACE_PUBLIC_HOST: ${CHEAPSPACE_PUBLIC_HOST:-localhost}
       CHEAPSPACE_AUTO_MIGRATE: "true"
-      CHEAPSPACE_DEFAULT_WORKSPACE_IMAGE: cheapspace-workspace:latest
+      CHEAPSPACE_DEFAULT_WORKSPACE_IMAGE: ${CHEAPSPACE_DEFAULT_WORKSPACE_IMAGE:-ghcr.io/arika0093/cheapspace-workspace:latest}
+      CHEAPSPACE_PORT_RANGE_START: 2200
+      CHEAPSPACE_PORT_RANGE_END: 2299
     ports:
-      - "8080:8080"
+      - "${CHEAPSPACE_HTTP_PORT:-8080}:8080"
     volumes:
       - cheapspace-data:/data
       - /var/run/docker.sock:/var/run/docker.sock

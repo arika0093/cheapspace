@@ -7,6 +7,7 @@ type Workspace struct {
 	Name                string
 	State               string
 	RepoURL             string
+	RepoBranch          string
 	DotfilesURL         string
 	SourceType          string
 	SourceRef           string

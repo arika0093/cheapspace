@@ -19,6 +19,8 @@ func TestWorkspaceLifecycle(t *testing.T) {
 	ctx := context.Background()
 	workspace, err := svc.CreateWorkspace(ctx, CreateWorkspaceInput{
 		Name:                "lifecycle",
+		RepoURL:             "https://github.com/example/repo.git",
+		RepoBranch:          "main",
 		SourceType:          "builtin_image",
 		CPUMillis:           1000,
 		MemoryMB:            1024,
@@ -39,6 +41,9 @@ func TestWorkspaceLifecycle(t *testing.T) {
 	}
 	if details.Workspace.State != "running" {
 		t.Fatalf("expected workspace to be running, got %q", details.Workspace.State)
+	}
+	if details.Workspace.RepoBranch != "main" {
+		t.Fatalf("expected repo branch to persist, got %q", details.Workspace.RepoBranch)
 	}
 	if details.Workspace.SSHPort == 0 {
 		t.Fatalf("expected SSH port to be assigned")
@@ -130,6 +135,129 @@ func TestCancelAndResumeBuildJob(t *testing.T) {
 	}
 }
 
+func TestWorkspacePasswordFallbackTracksSSHKeys(t *testing.T) {
+	t.Parallel()
+
+	svc, cleanup := newTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	workspace, err := svc.CreateWorkspace(ctx, CreateWorkspaceInput{
+		Name:                "with-key",
+		SourceType:          "builtin_image",
+		SSHKeys:             []string{"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICheapspaceTestKey user@example"},
+		PasswordAuthEnabled: true,
+		CPUMillis:           1000,
+		MemoryMB:            1024,
+		TTLMinutes:          15,
+	})
+	if err != nil {
+		t.Fatalf("CreateWorkspace() error = %v", err)
+	}
+
+	if err := svc.RunUntilIdle(ctx, 12); err != nil {
+		t.Fatalf("RunUntilIdle() error = %v", err)
+	}
+
+	details, err := svc.GetWorkspaceDetails(ctx, workspace.ID)
+	if err != nil {
+		t.Fatalf("GetWorkspaceDetails() error = %v", err)
+	}
+	if details.Workspace.PasswordAuthEnabled {
+		t.Fatalf("expected password fallback to be disabled when SSH keys are present")
+	}
+	if len(details.Keys) != 1 {
+		t.Fatalf("expected one SSH key to be stored, got %d", len(details.Keys))
+	}
+	if _, err := svc.RevealPassword(ctx, workspace.ID); err == nil {
+		t.Fatalf("expected RevealPassword() to fail when no password was generated")
+	}
+}
+
+func TestRequestedPortReusedAndProxyMirrors(t *testing.T) {
+	t.Parallel()
+
+	svc, cleanup := newTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	first, err := svc.CreateWorkspace(ctx, CreateWorkspaceInput{
+		Name:        "first-port",
+		SourceType:  "builtin_image",
+		SSHPort:     2305,
+		HTTPProxy:   "http://proxy.internal:8080",
+		ProxyPACURL: "https://proxy.internal/proxy.pac",
+		CPUMillis:   1000,
+		MemoryMB:    1024,
+		TTLMinutes:  15,
+	})
+	if err != nil {
+		t.Fatalf("CreateWorkspace(first) error = %v", err)
+	}
+	if err := svc.RunUntilIdle(ctx, 12); err != nil {
+		t.Fatalf("RunUntilIdle(first) error = %v", err)
+	}
+
+	firstDetails, err := svc.GetWorkspaceDetails(ctx, first.ID)
+	if err != nil {
+		t.Fatalf("GetWorkspaceDetails(first) error = %v", err)
+	}
+	if firstDetails.Workspace.SSHPort != 2305 {
+		t.Fatalf("expected requested SSH port to be used, got %d", firstDetails.Workspace.SSHPort)
+	}
+	if firstDetails.Workspace.HTTPSProxy != firstDetails.Workspace.HTTPProxy {
+		t.Fatalf("expected HTTPS proxy to mirror HTTP proxy, got %q and %q", firstDetails.Workspace.HTTPProxy, firstDetails.Workspace.HTTPSProxy)
+	}
+	if firstDetails.Workspace.ProxyPACURL != "https://proxy.internal/proxy.pac" {
+		t.Fatalf("expected proxy PAC URL to persist, got %q", firstDetails.Workspace.ProxyPACURL)
+	}
+
+	if err := svc.QueueWorkspaceDelete(ctx, first.ID); err != nil {
+		t.Fatalf("QueueWorkspaceDelete(first) error = %v", err)
+	}
+	if err := svc.RunUntilIdle(ctx, 12); err != nil {
+		t.Fatalf("RunUntilIdle(delete first) error = %v", err)
+	}
+
+	visible, err := svc.ListWorkspaces(ctx, false)
+	if err != nil {
+		t.Fatalf("ListWorkspaces(false) error = %v", err)
+	}
+	if len(visible) != 0 {
+		t.Fatalf("expected deleted workspaces to be hidden by default, got %d", len(visible))
+	}
+	all, err := svc.ListWorkspaces(ctx, true)
+	if err != nil {
+		t.Fatalf("ListWorkspaces(true) error = %v", err)
+	}
+	if len(all) != 1 {
+		t.Fatalf("expected deleted workspaces to be included when requested, got %d", len(all))
+	}
+
+	second, err := svc.CreateWorkspace(ctx, CreateWorkspaceInput{
+		Name:       "second-port",
+		SourceType: "builtin_image",
+		SSHPort:    2305,
+		CPUMillis:  1000,
+		MemoryMB:   1024,
+		TTLMinutes: 15,
+	})
+	if err != nil {
+		t.Fatalf("CreateWorkspace(second) error = %v", err)
+	}
+	if err := svc.RunUntilIdle(ctx, 12); err != nil {
+		t.Fatalf("RunUntilIdle(second) error = %v", err)
+	}
+
+	secondDetails, err := svc.GetWorkspaceDetails(ctx, second.ID)
+	if err != nil {
+		t.Fatalf("GetWorkspaceDetails(second) error = %v", err)
+	}
+	if secondDetails.Workspace.SSHPort != 2305 {
+		t.Fatalf("expected released port to be reusable, got %d", secondDetails.Workspace.SSHPort)
+	}
+}
+
 func newTestService(t *testing.T) (*Service, func()) {
 	t.Helper()
 
@@ -140,7 +268,7 @@ func newTestService(t *testing.T) (*Service, func()) {
 		DBPath:                filepath.Join(tempDir, "cheapspace.db"),
 		Runtime:               "mock",
 		PublicHost:            "localhost",
-		DefaultWorkspaceImage: "ghcr.io/cheapspace/workspace:test",
+		DefaultWorkspaceImage: "ghcr.io/arika0093/cheapspace-workspace:test",
 		AppSecret:             "test-secret",
 		MaxCPUMillis:          8000,
 		MaxMemoryMB:           16384,

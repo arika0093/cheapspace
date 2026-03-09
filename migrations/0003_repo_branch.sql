@@ -1,0 +1,1 @@
+ALTER TABLE workspaces ADD COLUMN repo_branch TEXT NOT NULL DEFAULT '';

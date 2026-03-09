@@ -37,8 +37,19 @@
             <input type="text" name="repo_url" value="{{.Form.RepoURL}}" class="form-field" placeholder="https://github.com/owner/repo.git">
           </div>
           <div class="space-y-2">
+            <label class="label">Repository branch</label>
+            <input type="text" name="repo_branch" value="{{.Form.RepoBranch}}" class="form-field" placeholder="main">
+          </div>
+        </div>
+
+        <div class="grid gap-4 lg:grid-cols-2">
+          <div class="space-y-2">
             <label class="label">Dotfiles URL</label>
             <input type="text" name="dotfiles_url" value="{{.Form.DotfilesURL}}" class="form-field" placeholder="https://github.com/owner/dotfiles.git">
+          </div>
+          <div class="space-y-2">
+            <label class="label">Clone behavior</label>
+            <p class="form-field text-soft">Repositories are cloned into <code class="code-inline">/workspaces</code> with full history. Leave the branch blank to use the default branch.</p>
           </div>
         </div>
 
@@ -81,8 +92,8 @@
         </div>
         <div class="grid gap-4 sm:grid-cols-2">
           <div class="space-y-2">
-            <label class="label">CPU (millicores)</label>
-            <input type="number" name="cpu_millis" value="{{.Form.CPUMillis}}" class="form-field">
+            <label class="label">CPU (cores)</label>
+            <input type="number" name="cpu_cores" value="{{.Form.CPUCores}}" min="1" class="form-field">
           </div>
           <div class="space-y-2">
             <label class="label">Memory (MB)</label>

@@ -85,11 +85,15 @@
           </div>
           <div class="surface-card">
             <p class="meta-label">Access</p>
-            <p class="mt-2">{{if gt $ws.SSHPort 0}}ssh -p {{$ws.SSHPort}} codespace@{{$ws.SSHHost}}{{else}}Pending{{end}}</p>
+            <p class="mt-2">{{if and (gt $ws.SSHPort 0) $ws.SSHHost}}ssh -p {{$ws.SSHPort}} codespace@{{$ws.SSHHost}}{{else}}Pending{{end}}</p>
           </div>
           <div class="surface-card">
             <p class="meta-label">Image</p>
             <p class="mt-2 break-all">{{if $ws.ResolvedImageRef}}{{$ws.ResolvedImageRef}}{{else}}Pending build resolution{{end}}</p>
+          </div>
+          <div class="surface-card">
+            <p class="meta-label">Branch</p>
+            <p class="mt-2">{{if $ws.RepoBranch}}{{$ws.RepoBranch}}{{else}}Default branch{{end}}</p>
           </div>
         </div>
       </article>

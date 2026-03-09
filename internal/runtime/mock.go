@@ -51,6 +51,7 @@ func (m *MockRuntime) Build(ctx context.Context, req BuildRequest, control Contr
 func (m *MockRuntime) Provision(ctx context.Context, req ProvisionRequest, control Control, logger Logger) (ProvisionResult, error) {
 	steps := []string{
 		"Creating workspace volume",
+		"Preparing repository checkout",
 		"Starting workspace container",
 		"Publishing SSH endpoint",
 		"Workspace marked ready",

@@ -36,6 +36,7 @@ type Service struct {
 type CreateWorkspaceInput struct {
 	Name                string
 	RepoURL             string
+	RepoBranch          string
 	DotfilesURL         string
 	SourceType          string
 	SourceRef           string
@@ -251,6 +252,7 @@ func (s *Service) CreateWorkspace(ctx context.Context, input CreateWorkspaceInpu
 		Name:                name,
 		State:               "pending",
 		RepoURL:             strings.TrimSpace(input.RepoURL),
+		RepoBranch:          strings.TrimSpace(input.RepoBranch),
 		DotfilesURL:         strings.TrimSpace(input.DotfilesURL),
 		SourceType:          input.SourceType,
 		SourceRef:           input.SourceRef,
@@ -457,6 +459,7 @@ func (s *Service) executeBuildJob(ctx context.Context, job db.Job, control jobCo
 		SourceType:     workspace.SourceType,
 		SourceRef:      workspace.SourceRef,
 		RepoURL:        workspace.RepoURL,
+		RepoBranch:     workspace.RepoBranch,
 		DotfilesURL:    workspace.DotfilesURL,
 		DefaultImage:   s.cfg.DefaultWorkspaceImage,
 		PublicHost:     s.cfg.PublicHost,
@@ -541,6 +544,7 @@ func (s *Service) executeProvisionJob(ctx context.Context, job db.Job, control j
 		SourceRef:           workspace.SourceRef,
 		ResolvedImageRef:    resolvedImage,
 		RepoURL:             workspace.RepoURL,
+		RepoBranch:          workspace.RepoBranch,
 		DotfilesURL:         workspace.DotfilesURL,
 		AuthorizedKeys:      authKeys,
 		Password:            password,
@@ -679,7 +683,7 @@ func (s *Service) validateInput(input CreateWorkspaceInput) error {
 		return errors.New("repository URL is required for Nixpacks")
 	}
 	if input.CPUMillis <= 0 || input.CPUMillis > s.cfg.MaxCPUMillis {
-		return fmt.Errorf("cpu must be between 1 and %d millicores", s.cfg.MaxCPUMillis)
+		return fmt.Errorf("cpu must be between 1 and %d cores", max(1, s.cfg.MaxCPUMillis/1000))
 	}
 	if input.MemoryMB <= 0 || input.MemoryMB > s.cfg.MaxMemoryMB {
 		return fmt.Errorf("memory must be between 1 and %d MB", s.cfg.MaxMemoryMB)

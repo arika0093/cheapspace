@@ -4,6 +4,9 @@
   * 詳細閲覧: SSHのコマンド、環境詳細、etc.(view)
   * 新規立ち上げ(new)
   * 削除(delete)
+
+
+将来的には::
 * GitHub App作成。
   * PR作成時に自動でcodespaceを立ち上げる。
   * PRクローズ時に自動でcodespaceを削除する。

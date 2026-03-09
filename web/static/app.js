@@ -19,6 +19,7 @@ onReady(() => {
   setupAutoSubmit();
   setupSourcePanels();
   setupWorkspaceFormBehavior();
+  setupCopyButtons();
   setupPasswordReveal();
   setupJobLogToggles();
   setupJobDetailPolling();
@@ -200,6 +201,32 @@ function setupPasswordReveal() {
   });
 }
 
+function setupCopyButtons() {
+  document.querySelectorAll("[data-copy-source]").forEach((button) => {
+    const defaultLabel = button.dataset.copyDefault || button.textContent.trim();
+    const successLabel = button.dataset.copySuccess || "Copied";
+
+    button.addEventListener("click", async () => {
+      const source = document.querySelector(button.dataset.copySource || "");
+      const value = source?.textContent?.trim() || "";
+      if (!value || /^Pending/i.test(value)) {
+        return;
+      }
+
+      try {
+        await copyText(value);
+        button.textContent = successLabel;
+      } catch {
+        button.textContent = "Copy failed";
+      }
+
+      window.setTimeout(() => {
+        button.textContent = defaultLabel;
+      }, 1600);
+    });
+  });
+}
+
 function setupJobLogToggles() {
   const root = document.querySelector("[data-job-detail]");
   if (!root) {
@@ -315,8 +342,11 @@ function setupWorkspaceDetailPolling() {
     const payload = await response.json();
     state.textContent = payload.workspace.State;
     state.className = `status-pill ${statusClassForClient(payload.workspace.State)}`;
-    if (payload.workspace.SSHPort > 0) {
+    if (payload.workspace.SSHPort > 0 && payload.workspace.SSHHost) {
       ssh.textContent = `ssh -p ${payload.workspace.SSHPort} codespace@${payload.workspace.SSHHost}`;
+      document.querySelectorAll("[data-copy-source='#workspace-ssh-command']").forEach((button) => {
+        button.disabled = false;
+      });
     }
     hostname.textContent = payload.workspace.PublicHostname || "Not configured";
     lastError.textContent = payload.workspace.LastError || "";
@@ -366,6 +396,23 @@ function createLogPill(text) {
   return pill;
 }
 
+async function copyText(value) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const input = document.createElement("textarea");
+  input.value = value;
+  input.setAttribute("readonly", "");
+  input.style.position = "absolute";
+  input.style.left = "-9999px";
+  document.body.appendChild(input);
+  input.select();
+  document.execCommand("copy");
+  input.remove();
+}
+
 function formatLogTimestamp(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -386,18 +433,18 @@ function statusClassForClient(value) {
   switch (value) {
     case "running":
     case "done":
-      return "bg-emerald-500/15 text-emerald-700 ring-1 ring-inset ring-emerald-500/30 dark:text-emerald-300";
+      return "status-running";
     case "queued":
     case "pending":
     case "building":
     case "provisioning":
-      return "bg-sky-500/15 text-sky-700 ring-1 ring-inset ring-sky-500/30 dark:text-sky-300";
+      return "status-pending";
     case "deleting":
-      return "bg-amber-500/15 text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-300";
+      return "status-warning";
     case "failed":
     case "cancelled":
-      return "bg-rose-500/15 text-rose-700 ring-1 ring-inset ring-rose-500/30 dark:text-rose-300";
+      return "status-error";
     default:
-      return "bg-slate-500/15 text-slate-600 ring-1 ring-inset ring-slate-400/30 dark:text-slate-300";
+      return "status-neutral";
   }
 }

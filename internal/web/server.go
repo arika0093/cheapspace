@@ -44,6 +44,7 @@ type viewData struct {
 type workspaceForm struct {
 	Name                string
 	RepoURL             string
+	RepoBranch          string
 	DotfilesURL         string
 	SourceType          string
 	SourceRef           string
@@ -54,7 +55,7 @@ type workspaceForm struct {
 	HTTPSProxy          string
 	NoProxy             string
 	ProxyPACURL         string
-	CPUMillis           int
+	CPUCores            int
 	MemoryMB            int
 	TTLMinutes          int
 	TraefikEnabled      bool
@@ -94,6 +95,7 @@ func New(cfg config.Config, svc *service.Service) (*Server, error) {
 			}
 			return value[:max] + "..."
 		},
+		"formatCores": formatCores,
 		"joinSSHKeys": func(keys []db.WorkspaceSSHKey) string {
 			items := make([]string, 0, len(keys))
 			for _, key := range keys {
@@ -175,7 +177,7 @@ func (s *Server) handleWorkspaceNew(w http.ResponseWriter, r *http.Request) {
 		Form: workspaceForm{
 			SourceType: "builtin_image",
 			NoProxy:    defaultNoProxyValue(),
-			CPUMillis:  minInt(2000, s.cfg.MaxCPUMillis),
+			CPUCores:   millicoresToCores(minInt(2000, s.cfg.MaxCPUMillis)),
 			MemoryMB:   minInt(4096, s.cfg.MaxMemoryMB),
 			TTLMinutes: minInt(480, s.cfg.MaxTTLMinutes),
 		},
@@ -188,9 +190,12 @@ func (s *Server) handleWorkspaceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	defaultCPUMillis := minInt(2000, s.cfg.MaxCPUMillis)
+	cpuMillis := parseCPUMillisValue(r.FormValue("cpu_cores"), r.FormValue("cpu_millis"), defaultCPUMillis)
 	form := workspaceForm{
 		Name:              strings.TrimSpace(r.FormValue("name")),
 		RepoURL:           strings.TrimSpace(r.FormValue("repo_url")),
+		RepoBranch:        strings.TrimSpace(r.FormValue("repo_branch")),
 		DotfilesURL:       strings.TrimSpace(r.FormValue("dotfiles_url")),
 		SourceType:        strings.TrimSpace(r.FormValue("source_type")),
 		SourceRef:         r.FormValue("source_ref"),
@@ -200,7 +205,7 @@ func (s *Server) handleWorkspaceCreate(w http.ResponseWriter, r *http.Request) {
 		HTTPSProxy:        strings.TrimSpace(r.FormValue("https_proxy")),
 		NoProxy:           strings.TrimSpace(r.FormValue("no_proxy")),
 		ProxyPACURL:       strings.TrimSpace(r.FormValue("proxy_pac_url")),
-		CPUMillis:         atoiDefault(r.FormValue("cpu_millis"), minInt(2000, s.cfg.MaxCPUMillis)),
+		CPUCores:          millicoresToCores(cpuMillis),
 		MemoryMB:          atoiDefault(r.FormValue("memory_mb"), minInt(4096, s.cfg.MaxMemoryMB)),
 		TTLMinutes:        atoiDefault(r.FormValue("ttl_minutes"), minInt(480, s.cfg.MaxTTLMinutes)),
 		TraefikEnabled:    r.FormValue("traefik_enabled") == "on",
@@ -216,6 +221,7 @@ func (s *Server) handleWorkspaceCreate(w http.ResponseWriter, r *http.Request) {
 	workspace, err := s.service.CreateWorkspace(r.Context(), service.CreateWorkspaceInput{
 		Name:              form.Name,
 		RepoURL:           form.RepoURL,
+		RepoBranch:        form.RepoBranch,
 		DotfilesURL:       form.DotfilesURL,
 		SourceType:        form.SourceType,
 		SourceRef:         form.SourceRef,
@@ -225,7 +231,7 @@ func (s *Server) handleWorkspaceCreate(w http.ResponseWriter, r *http.Request) {
 		HTTPSProxy:        form.HTTPSProxy,
 		NoProxy:           form.NoProxy,
 		ProxyPACURL:       form.ProxyPACURL,
-		CPUMillis:         form.CPUMillis,
+		CPUMillis:         cpuMillis,
 		MemoryMB:          form.MemoryMB,
 		TTLMinutes:        form.TTLMinutes,
 		TraefikEnabled:    form.TraefikEnabled,
@@ -402,15 +408,15 @@ func writeJSON(w http.ResponseWriter, statusCode int, value any) {
 func statusClass(value string) string {
 	switch value {
 	case "running", "done":
-		return "bg-emerald-500/15 text-emerald-300 ring-1 ring-inset ring-emerald-400/40"
+		return "status-running"
 	case "queued", "pending", "building", "provisioning":
-		return "bg-sky-500/15 text-sky-300 ring-1 ring-inset ring-sky-400/40"
+		return "status-pending"
 	case "deleting":
-		return "bg-amber-500/15 text-amber-300 ring-1 ring-inset ring-amber-400/40"
+		return "status-warning"
 	case "failed", "cancelled":
-		return "bg-rose-500/15 text-rose-300 ring-1 ring-inset ring-rose-400/40"
+		return "status-error"
 	default:
-		return "bg-slate-500/15 text-slate-300 ring-1 ring-inset ring-slate-400/40"
+		return "status-neutral"
 	}
 }
 
@@ -445,6 +451,47 @@ func minInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func parseCPUMillisValue(coresValue, legacyMillicoresValue string, fallback int) int {
+	if strings.TrimSpace(coresValue) != "" {
+		cores := atoiDefault(coresValue, millicoresToCores(fallback))
+		return coresToMillicores(cores)
+	}
+	return atoiDefault(legacyMillicoresValue, fallback)
+}
+
+func coresToMillicores(cores int) int {
+	if cores <= 0 {
+		return 0
+	}
+	return cores * 1000
+}
+
+func millicoresToCores(millicores int) int {
+	if millicores <= 0 {
+		return 0
+	}
+	cores := millicores / 1000
+	if millicores%1000 != 0 {
+		cores++
+	}
+	return cores
+}
+
+func formatCores(millicores int) string {
+	if millicores <= 0 {
+		return "-"
+	}
+	if millicores%1000 == 0 {
+		cores := millicores / 1000
+		if cores == 1 {
+			return "1 core"
+		}
+		return fmt.Sprintf("%d cores", cores)
+	}
+	value := float64(millicores) / 1000.0
+	return fmt.Sprintf("%.1f cores", value)
 }
 
 func queryEnabled(value string) bool {

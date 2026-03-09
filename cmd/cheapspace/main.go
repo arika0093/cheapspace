@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -19,12 +20,12 @@ import (
 )
 
 func main() {
-	if err := run(os.Args[1:]); err != nil {
+	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(args []string) error {
+func run(args []string, stdout, stderr io.Writer) error {
 	cfg := config.Load()
 	if len(args) == 0 {
 		return serve(cfg)
@@ -34,7 +35,9 @@ func run(args []string) error {
 	case "serve":
 		return serve(cfg)
 	case "migrate":
-		return migrateCommand(cfg, args[1:])
+		return migrateCommand(cfg, args[1:], stdout)
+	case "workspace", "workspaces":
+		return workspaceCommand(cfg, args[1:], stdout, stderr)
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
@@ -88,7 +91,7 @@ func serve(cfg config.Config) error {
 	return nil
 }
 
-func migrateCommand(cfg config.Config, args []string) error {
+func migrateCommand(cfg config.Config, args []string, stdout io.Writer) error {
 	if len(args) == 0 {
 		return fmt.Errorf("usage: cheapspace migrate [up|status]")
 	}
@@ -116,7 +119,7 @@ func migrateCommand(cfg config.Config, args []string) error {
 			if status.AppliedAt != nil {
 				when = status.AppliedAt.Local().Format(time.RFC3339)
 			}
-			fmt.Printf("%s\t%s\t%s\n", status.Version, applied, when)
+			fmt.Fprintf(stdout, "%s\t%s\t%s\n", status.Version, applied, when)
 		}
 		return nil
 	default:

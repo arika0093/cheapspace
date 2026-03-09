@@ -30,6 +30,9 @@ func TestWorkspacesPageRenders(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "Workspace inventory") {
 		t.Fatalf("expected response body to contain workspace inventory heading")
 	}
+	if !strings.Contains(rec.Body.String(), "Include deleted workspaces") {
+		t.Fatalf("expected response body to contain deleted workspace toggle")
+	}
 }
 
 func TestCreateWorkspaceRedirects(t *testing.T) {
@@ -41,11 +44,14 @@ func TestCreateWorkspaceRedirects(t *testing.T) {
 	form := url.Values{
 		"name":        {"handler-test"},
 		"source_type": {"builtin_image"},
-		"cpu_millis":  {"1000"},
+		"cpu_cores":   {"2"},
 		"memory_mb":   {"1024"},
 		"ttl_minutes": {"10"},
 		"ssh_keys":    {""},
 		"repo_url":    {"https://github.com/example/repo.git"},
+		"repo_branch": {"main"},
+		"ssh_port":    {"2301"},
+		"http_proxy":  {"http://proxy.internal:8080"},
 	}
 	req := httptest.NewRequest(http.MethodPost, "/workspaces", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -72,7 +78,7 @@ func newTestHandler(t *testing.T) (http.Handler, func()) {
 		DBPath:                filepath.Join(tempDir, "cheapspace.db"),
 		Runtime:               "mock",
 		PublicHost:            "localhost",
-		DefaultWorkspaceImage: "ghcr.io/cheapspace/workspace:test",
+		DefaultWorkspaceImage: "ghcr.io/arika0093/cheapspace-workspace:test",
 		AppSecret:             "test-secret",
 		MaxCPUMillis:          8000,
 		MaxMemoryMB:           16384,

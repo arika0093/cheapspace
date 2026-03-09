@@ -16,7 +16,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/cheapspace ./cmd/chea
 FROM docker:28-cli AS dockercli
 
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git
 RUN curl -sSL https://nixpacks.com/install.sh | bash
 COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=build /out/cheapspace /usr/local/bin/cheapspace
