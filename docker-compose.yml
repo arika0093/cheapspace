@@ -1,0 +1,22 @@
+services:
+  cheapspace:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+    environment:
+      CHEAPSPACE_ADDR: 0.0.0.0:8080
+      CHEAPSPACE_DATA_DIR: /data
+      CHEAPSPACE_RUNTIME: docker
+      CHEAPSPACE_PUBLIC_HOST: localhost
+      CHEAPSPACE_AUTO_MIGRATE: "true"
+      CHEAPSPACE_DEFAULT_WORKSPACE_IMAGE: cheapspace-workspace:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - cheapspace-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+volumes:
+  cheapspace-data:
+

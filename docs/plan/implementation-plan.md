@@ -505,3 +505,6 @@ CI 安定性のため、**Playwright はまず mock runtime backend を使って
 Cheapspace の初期実装は **Go 単一バイナリのモノリス + templ SSR + Tailwind v4 + Stimulus + SQLite(sqlc/goose) + Docker-compatible runtime abstraction** を推奨する。これにより、「単一言語志向」「self-hostable」「`docker compose up` で最小構成」「workspace に DinD を提供」「job 可視化」「将来的な Podman / Traefik 連携」という要求を同時に満たしやすくなる。
 
 特に重要なのは、**native SSH はまず host port mapping で確実に提供し、443 共有 SSH は tunnel 技術を前提に phase-2 として切り出す** こと、そして **workspace には host docker.sock を渡さず rootless nested runtime を使う** ことである。これにより、MVP を現実的な複雑さに保ちながら、将来拡張の余地も確保できる。
+
+## 開発時の注意書き
+* 各作業を行うたびにコミットを行うこと。

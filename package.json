@@ -1,0 +1,23 @@
+{
+  "name": "cheapspace",
+  "version": "1.0.0",
+  "description": "Alternative to GitHub Codespaces. Self-hostable.",
+  "private": true,
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "build:css": "tailwindcss -i ./web/assets/app.css -o ./web/static/app.css --minify",
+    "serve:test": "npm run build:css && node ./scripts/start-test-server.mjs",
+    "test:e2e": "playwright test",
+    "test:all": "npm run build:css && go test ./... && playwright test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@tailwindcss/cli": "^4.1.12",
+    "tailwindcss": "^4.1.12"
+  }
+}

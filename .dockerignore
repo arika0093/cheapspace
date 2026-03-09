@@ -1,0 +1,12 @@
+.git
+.github
+.vscode
+docs
+node_modules
+tmp
+data
+playwright-report
+test-results
+playwright-output.txt
+coverage
+
